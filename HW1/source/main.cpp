@@ -10,7 +10,6 @@ using namespace std;
 
 int num_vertices;
 GLuint VAO;
-GLuint lightCubeVAO;
 float rot_x = -90.0f;
 float rot_y = 0.0f;
 float light_rot_y = 0.0f;
@@ -18,65 +17,11 @@ float light_rot_z = 0.0f;
 float camera_distance = 50.0f;
 float lastX = 400, lastY = 300;
 cy::GLSLProgram prog;
-cy::GLSLProgram lightCubeProg;
 bool leftButtonPressed = false;
 bool controlKeyPressed = false;
 cy::TriMesh mesh;
-bool orthogonal_projection_on = false;
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
-float lightCubeVertices[] = {
-        -0.5f, -0.5f, -0.5f, 
-         0.5f, -0.5f, -0.5f,  
-         0.5f,  0.5f, -0.5f,  
-         0.5f,  0.5f, -0.5f,  
-        -0.5f,  0.5f, -0.5f, 
-        -0.5f, -0.5f, -0.5f, 
-
-        -0.5f, -0.5f,  0.5f, 
-         0.5f, -0.5f,  0.5f,  
-         0.5f,  0.5f,  0.5f,  
-         0.5f,  0.5f,  0.5f,  
-        -0.5f,  0.5f,  0.5f, 
-        -0.5f, -0.5f,  0.5f, 
-
-        -0.5f,  0.5f,  0.5f, 
-        -0.5f,  0.5f, -0.5f, 
-        -0.5f, -0.5f, -0.5f, 
-        -0.5f, -0.5f, -0.5f, 
-        -0.5f, -0.5f,  0.5f, 
-        -0.5f,  0.5f,  0.5f, 
-
-         0.5f,  0.5f,  0.5f,  
-         0.5f,  0.5f, -0.5f,  
-         0.5f, -0.5f, -0.5f,  
-         0.5f, -0.5f, -0.5f,  
-         0.5f, -0.5f,  0.5f,  
-         0.5f,  0.5f,  0.5f,  
-
-        -0.5f, -0.5f, -0.5f, 
-         0.5f, -0.5f, -0.5f,  
-         0.5f, -0.5f,  0.5f,  
-         0.5f, -0.5f,  0.5f,  
-        -0.5f, -0.5f,  0.5f, 
-        -0.5f, -0.5f, -0.5f, 
-
-        -0.5f,  0.5f, -0.5f, 
-         0.5f,  0.5f, -0.5f,  
-         0.5f,  0.5f,  0.5f,  
-         0.5f,  0.5f,  0.5f,  
-        -0.5f,  0.5f,  0.5f, 
-        -0.5f,  0.5f, -0.5f, 
-    };
-
-cy::Matrix4f getOrthographicMatrix(float left, float right, float bottom, float top, float near, float far) {
-        cy::Matrix4f proj = cy::Matrix4f(2.0f / (right - left), 0, 0, -(right + left) / (right - left),
-        0, 2.0f / (top - bottom), 0, -(top + bottom) / (top - bottom),
-        0, 0, -2.0f / (far - near),  -(far + near) / (far - near),
-        0, 0, 0, 1);
-
-        return proj;
-}
 
 void display() {
     // set uniforms    
@@ -91,12 +36,7 @@ void display() {
     
     cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
     cy::Matrix4f proj = cy::Matrix4f(1.0);
-    if (!orthogonal_projection_on) {
-        proj *= cy::Matrix4f::Perspective(40 * 3.14 /180.0, 800.0/600.0, 2.0f, 1000.0f);
-    } else {
-        float scale_factor = 500.0f/camera_distance;
-        proj*= getOrthographicMatrix(-scale_factor, scale_factor, -scale_factor, scale_factor, 0.1f, 1500.0f);
-    }
+    proj *= cy::Matrix4f::Perspective(40 * 3.14 /180.0, 800.0/600.0, 2.0f, 1000.0f);
 
     // Your rendering code goes here
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -111,25 +51,14 @@ void display() {
     prog["normalTransform"] = (view*model).GetSubMatrix3();
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(lightCubeVAO);
     glutSwapBuffers();
 }
 
 void keyboard(unsigned char key, int x, int y) {
     if (key == 27) {  // ASCII value for the Esc key
         glutLeaveMainLoop();
-    } else if (key == 'P' || key == 'p') {
-        orthogonal_projection_on = !orthogonal_projection_on;
-        if (orthogonal_projection_on) {
-            cout << "Switched to orthogonal projection." << endl;
-        } else {
-            cout << "Switched to perspective projection." << endl;
-        }
-        glutPostRedisplay();
     } 
 }
-
-
 
 void specialKeyboard(int key, int x, int y) {
     switch (key) {
@@ -286,20 +215,9 @@ int main(int argc, char** argv) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * mesh.NF() * 3, &mesh.F(0), GL_STATIC_DRAW);
 
-    glGenVertexArrays(1, &lightCubeVAO); 
-    glBindVertexArray(lightCubeVAO);
-
-    GLuint lightCubeVBO;
-    glGenBuffers(1, &lightCubeVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, lightCubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(lightCubeVertices), lightCubeVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
 
     // link shaders
     prog.BuildFiles("vs.txt", "fs.txt");
-    lightCubeProg.BuildFiles("vs.txt", "lightcube_fs.txt");
 
 
     // Enter the GLUT event loop
