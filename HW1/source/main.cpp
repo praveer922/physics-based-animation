@@ -112,11 +112,6 @@ void display() {
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(lightCubeVAO);
-    lightCubeProg.Bind();
-    lightCubeProg["model"] = model * cy::Matrix4f::RotationY(light_rot_y * 3.14 /180.0) * cy::Matrix4f::RotationZ(light_rot_z * 3.14 /180.0) *  cy::Matrix4f::Translation(lightPosLocalSpace);
-    lightCubeProg["view"] = view;
-    lightCubeProg["projection"] = proj;
-    glDrawArrays(GL_TRIANGLES, 0, 36);
     glutSwapBuffers();
 }
 

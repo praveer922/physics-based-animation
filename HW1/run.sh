@@ -1,3 +1,3 @@
 #! /bin/sh
 
-cd build/; ./hw1 teapot.obj
+cd build/; ./hw1 sphere.obj
