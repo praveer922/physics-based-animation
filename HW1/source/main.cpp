@@ -22,11 +22,14 @@ bool leftButtonPressed = false;
 bool controlKeyPressed = false;
 cy::TriMesh mesh;
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
-cy::Vec3f sphereWorldPos = cy::Vec3f(0.0, 0.0, 0.0);
 
 // Variables to store mouse click position
 float lastClickX, lastClickY;
 bool arrowVisible = false;
+
+// variables for physics
+cy::Vec3f sphereWorldPos = cy::Vec3f(0.0, 0.0, 0.0);
+cy::Vec3f forceVector;
 
 // view and proj matrices (since camera is fixed)
 cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
@@ -95,6 +98,9 @@ void display() {
             ndcStart.x, ndcStart.y,   // Start point in screen space (normalized NDC) for (400, 300)
             ndcEnd.x, ndcEnd.y  // End point in screen space (normalized NDC) for (400, 400)
         };
+
+        //update current force vector
+        forceVector = cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f) * 10.0f;
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
 
