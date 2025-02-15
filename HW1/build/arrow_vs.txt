@@ -1,0 +1,7 @@
+#version 330 core
+
+layout(location = 0) in vec2 pos; // Position of the line's endpoints in screen space (normalized)
+
+void main() {
+    gl_Position = vec4(pos, 0.0, 1.0); // Directly use position in screen space (NDC)
+}

@@ -10,17 +10,43 @@ using namespace std;
 
 int num_vertices;
 GLuint VAO;
+GLuint lineVAO;
 float rot_x = -90.0f;
 float rot_y = 0.0f;
 float light_rot_y = 0.0f;
 float light_rot_z = 0.0f;
 float camera_distance = 50.0f;
-float lastX = 400, lastY = 300;
 cy::GLSLProgram prog;
+cy::GLSLProgram lineProg;
 bool leftButtonPressed = false;
 bool controlKeyPressed = false;
 cy::TriMesh mesh;
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
+cy::Vec3f sphereWorldPos = cy::Vec3f(0.0, 0.0, 0.0);
+
+// Variables to store mouse click position
+float lastClickX, lastClickY;
+bool arrowVisible = false;
+
+// view and proj matrices (since camera is fixed)
+cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
+cy::Matrix4f proj = cy::Matrix4f::Perspective(40 * 3.14 / 180.0, 800.0 / 600.0, 2.0f, 1000.0f);
+
+
+GLfloat lineVertices[] = {
+    0.0f, 0.0f,   // Start point in screen space (normalized NDC) for (400, 300)
+    0.0f, 0.333f  // End point in screen space (normalized NDC) for (400, 400)
+};
+
+cy::Vec2f screenToNDC(int screenX, int screenY, int screenWidth, int screenHeight) {
+    cy::Vec2f ndc;
+    // Convert X from screen space to NDC (-1 to 1)
+    ndc.x = 2.0f * screenX / screenWidth - 1.0f;
+    // Convert Y from screen space to NDC (1 to -1)
+    ndc.y = 1.0f - 2.0f * screenY / screenHeight;
+    return ndc;
+}
+
 
 
 void display() {
@@ -28,15 +54,10 @@ void display() {
      // Calculate the bounding box
     mesh.ComputeBoundingBox();
     cy::Vec3f center = (mesh.GetBoundMin() + mesh.GetBoundMax()) * 0.5f;
-
-    //add two rotations to model matrix
-    cy::Matrix4f model = cy::Matrix4f::RotationX(rot_x * 3.14 /180.0) * cy::Matrix4f::RotationY(rot_y * 3.14 /180.0);
     // Adjust the model transformation matrix to center the object
-    model *= cy::Matrix4f::Translation(-center); 
-    
-    cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
-    cy::Matrix4f proj = cy::Matrix4f(1.0);
-    proj *= cy::Matrix4f::Perspective(40 * 3.14 /180.0, 800.0/600.0, 2.0f, 1000.0f);
+    cy::Matrix4f model = cy::Matrix4f::Translation(-center); 
+    model *= cy::Matrix4f::Translation(sphereWorldPos);
+
 
     // Your rendering code goes here
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -51,6 +72,42 @@ void display() {
     prog["normalTransform"] = (view*model).GetSubMatrix3();
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
+
+    // DRAW LINE
+    if (arrowVisible)
+    {
+        GLuint lineVBO;
+        glGenVertexArrays(1, &lineVAO);
+        glBindVertexArray(lineVAO);
+
+        glGenBuffers(1, &lineVBO);
+        glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
+
+        // Define two points in normalized screen space (NDC)
+        // Compute the sphere's clip-space coordinate from its world position
+        cy::Vec4f clipPos = proj * view * cy::Vec4f(sphereWorldPos, 1.0f);
+        // Perform perspective divide to get NDC
+        clipPos /= clipPos.w;
+        // ndcStart is the (x, y) in normalized device coordinates
+        cy::Vec2f ndcStart(clipPos.x, clipPos.y);
+        cy::Vec2f ndcEnd = screenToNDC(lastClickX,lastClickY, 800, 600);
+        GLfloat lineVertices[] = {
+            ndcStart.x, ndcStart.y,   // Start point in screen space (normalized NDC) for (400, 300)
+            ndcEnd.x, ndcEnd.y  // End point in screen space (normalized NDC) for (400, 400)
+        };
+
+        glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glBindVertexArray(0); // Unbind the VAO
+        lineProg.Bind();
+        glBindVertexArray(lineVAO);
+        glDrawArrays(GL_LINES, 0, 2); // Draw the line using two points
+        glBindVertexArray(0);
+    }
+
     glutSwapBuffers();
 }
 
@@ -86,48 +143,15 @@ void specialKeyboardUp(int key, int x, int y) {
 }
 
 void handleMouse(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON) {
-        leftButtonPressed = (state == GLUT_DOWN);
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        cout << "Mouse Click at: (" << x << ", " << y << ")" << endl;
+        lastClickX = x;
+        lastClickY = y;
+        arrowVisible = true;
+        glutPostRedisplay();
     }
-
-    // Update last mouse position
-    lastX = x;
-    lastY = y;
 }
 
-void mouseMotion(int x, int y) {
-    float xoffset = x - lastX;
-    float yoffset = lastY - y; // reversed since y-coordinates range from bottom to top
-    lastX = x;
-    lastY = y;
-
-    const float sensitivity = 0.3f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-    if (leftButtonPressed) {
-        if (controlKeyPressed) {
-            light_rot_y +=xoffset;
-            light_rot_z += yoffset;
-        } else {
-            rot_x -=yoffset;
-            rot_y +=xoffset;
-        }
-
-    } else {
-        camera_distance -= yoffset;
-    }
-
-    glutPostRedisplay();
-}
-
-void idle() {
-    // hue += 0.1f;
-
-    // hue = fmod(hue, 360.0f);
-
-    // // Trigger a redraw
-    // glutPostRedisplay();
-}
 
 void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
     char * modelName;
@@ -151,6 +175,18 @@ void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
         mesh.ComputeNormals();
     }
 }
+
+//void loadArrowModel(const char* filename) {
+//    bool success = arrowMesh.LoadFromFileObj(filename);
+//    if (!success) {
+//        cout << "Arrow model loading failed." << endl;
+//        exit(0);
+//    } else {
+//        cout << "Arrow model loaded successfully." << endl;
+//        num_vertices_arrow = arrowMesh.NV();
+//        arrowMesh.ComputeNormals(); // Compute normals for proper lighting
+//    }
+//}
 
 
 
@@ -183,14 +219,13 @@ int main(int argc, char** argv) {
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(specialKeyboard);
     glutSpecialUpFunc(specialKeyboardUp);
-    glutIdleFunc(idle);
     glutMouseFunc(handleMouse);
-    glutMotionFunc(mouseMotion);
 
 
 
-    // load model
+    // load models
     loadModel(argc, argv, mesh);
+    //loadArrowModel("arrow.obj");
 
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 
@@ -218,6 +253,8 @@ int main(int argc, char** argv) {
 
     // link shaders
     prog.BuildFiles("vs.txt", "fs.txt");
+    lineProg.BuildFiles("arrow_vs.txt", "lightcube_fs.txt");
+
 
 
     // Enter the GLUT event loop
