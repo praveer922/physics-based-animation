@@ -29,6 +29,7 @@ float lastClickX, lastClickY;
 bool arrowVisible = false;
 
 // variables for physics
+float dampingFactor = 0.5f;
 struct PhysicsState {
     cy::Vec3f position;
     cy::Vec3f velocity;
@@ -46,6 +47,9 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
 cy::Matrix4f proj = cy::Matrix4f::Perspective(40 * 3.14 / 180.0, 800.0 / 600.0, 2.0f, 1000.0f);
 
+// toggles for velocity/force fields
+bool velocityFieldOn = false;
+
 
 GLfloat lineVertices[] = {
     0.0f, 0.0f,   // Start point in screen space (normalized NDC) for (400, 300)
@@ -61,6 +65,11 @@ cy::Vec2f screenToNDC(int screenX, int screenY, int screenWidth, int screenHeigh
     return ndc;
 }
 
+cy::Vec3f getVelocityMapping(cy::Vec3f worldPos) {
+    return cy::Vec3f(0.01f, -0.01f, 0.0f);
+}
+
+
 void PhysicsUpdate(PhysicsState& state, const cy::Vec3f& force, float deltaTime) {
     if (state.mass <= 0.0f) return; // Avoid division by zero
     
@@ -70,8 +79,9 @@ void PhysicsUpdate(PhysicsState& state, const cy::Vec3f& force, float deltaTime)
     // Integrate velocity: v = v0 + a * dt
     state.velocity += state.acceleration * deltaTime;
 
-    // friction
-    //state.velocity *= dampingFactor;
+    if (velocityFieldOn) {
+        state.velocity += getVelocityMapping(state.position) * dampingFactor;
+    }
     
     // Integrate position: p = p0 + v * dt
     state.position += state.velocity * deltaTime;
@@ -123,8 +133,8 @@ void display() {
         cy::Vec2f ndcStart(clipPos.x, clipPos.y);
         cy::Vec2f ndcEnd = screenToNDC(lastClickX,lastClickY, 800, 600);
         GLfloat lineVertices[] = {
-            ndcStart.x, ndcStart.y,   // Start point in screen space (normalized NDC) for (400, 300)
-            ndcEnd.x, ndcEnd.y  // End point in screen space (normalized NDC) for (400, 400)
+            ndcStart.x, ndcStart.y,   // Start point in screen space (normalized NDC) 
+            ndcEnd.x, ndcEnd.y  // End point in screen space (normalized NDC) 
         };
 
         //update current force vector
@@ -148,7 +158,15 @@ void display() {
 void keyboard(unsigned char key, int x, int y) {
     if (key == 27) {  // ASCII value for the Esc key
         glutLeaveMainLoop();
-    } 
+    } else if (key == 'v' || key == 'V') {  // Handle both uppercase and lowercase 'v'
+        velocityFieldOn = !velocityFieldOn;
+        if (velocityFieldOn) {
+            cout << "Velocity field is ON." << endl;
+        } else {
+            cout << "Velocity field is OFF." << endl;
+        }
+        
+    }
 }
 
 void specialKeyboard(int key, int x, int y) {
@@ -178,7 +196,6 @@ void specialKeyboardUp(int key, int x, int y) {
 
 void handleMouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        cout << "Mouse Click at: (" << x << ", " << y << ")" << endl;
         lastClickX = x;
         lastClickY = y;
         arrowVisible = true;
