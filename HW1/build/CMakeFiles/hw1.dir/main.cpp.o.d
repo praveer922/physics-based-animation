@@ -280,4 +280,6 @@ CMakeFiles/hw1.dir/main.cpp.o: \
  /usr/include/X11/Xfuncproto.h /usr/include/X11/Xosdefs.h \
  /usr/include/X11/Xutil.h /usr/include/X11/keysym.h \
  /usr/include/X11/keysymdef.h /usr/include/GL/glxext.h \
- /usr/include/inttypes.h
+ /usr/include/inttypes.h /usr/include/c++/11/chrono \
+ /usr/include/c++/11/ratio /usr/include/c++/11/ctime \
+ /usr/include/c++/11/bits/parse_numbers.h

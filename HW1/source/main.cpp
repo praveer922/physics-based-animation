@@ -5,6 +5,7 @@
 #include "cyMatrix.h"
 #include "cyGL.h"
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 
@@ -28,8 +29,18 @@ float lastClickX, lastClickY;
 bool arrowVisible = false;
 
 // variables for physics
-cy::Vec3f sphereWorldPos = cy::Vec3f(0.0, 0.0, 0.0);
+struct PhysicsState {
+    cy::Vec3f position;
+    cy::Vec3f velocity;
+    cy::Vec3f acceleration;
+    float mass;
+};
+
+PhysicsState physicsState;
 cy::Vec3f forceVector;
+
+// simulation/render time steps
+auto lastTime = std::chrono::high_resolution_clock::now();
 
 // view and proj matrices (since camera is fixed)
 cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
@@ -50,6 +61,23 @@ cy::Vec2f screenToNDC(int screenX, int screenY, int screenWidth, int screenHeigh
     return ndc;
 }
 
+void PhysicsUpdate(PhysicsState& state, const cy::Vec3f& force, float deltaTime) {
+    if (state.mass <= 0.0f) return; // Avoid division by zero
+    
+    // Compute acceleration using Newton's Second Law: F = ma -> a = F/m
+    state.acceleration = force / state.mass;
+    
+    // Integrate velocity: v = v0 + a * dt
+    state.velocity += state.acceleration * deltaTime;
+
+    // friction
+    //state.velocity *= dampingFactor;
+    
+    // Integrate position: p = p0 + v * dt
+    state.position += state.velocity * deltaTime;
+
+}
+
 
 
 void display() {
@@ -59,7 +87,7 @@ void display() {
     cy::Vec3f center = (mesh.GetBoundMin() + mesh.GetBoundMax()) * 0.5f;
     // Adjust the model transformation matrix to center the object
     cy::Matrix4f model = cy::Matrix4f::Translation(-center); 
-    model *= cy::Matrix4f::Translation(sphereWorldPos);
+    model *= cy::Matrix4f::Translation(physicsState.position);
 
 
     // Your rendering code goes here
@@ -88,7 +116,7 @@ void display() {
 
         // Define two points in normalized screen space (NDC)
         // Compute the sphere's clip-space coordinate from its world position
-        cy::Vec4f clipPos = proj * view * cy::Vec4f(sphereWorldPos, 1.0f);
+        cy::Vec4f clipPos = proj * view * cy::Vec4f(physicsState.position, 1.0f);
         // Perform perspective divide to get NDC
         clipPos /= clipPos.w;
         // ndcStart is the (x, y) in normalized device coordinates
@@ -100,7 +128,7 @@ void display() {
         };
 
         //update current force vector
-        forceVector = cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f) * 10.0f;
+        forceVector = (cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f)) * 10.0f;
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
 
@@ -182,21 +210,23 @@ void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
     }
 }
 
-//void loadArrowModel(const char* filename) {
-//    bool success = arrowMesh.LoadFromFileObj(filename);
-//    if (!success) {
-//        cout << "Arrow model loading failed." << endl;
-//        exit(0);
-//    } else {
-//        cout << "Arrow model loaded successfully." << endl;
-//        num_vertices_arrow = arrowMesh.NV();
-//        arrowMesh.ComputeNormals(); // Compute normals for proper lighting
-//    }
-//}
+void idle() {
+    // first, update physics
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> elapsedTime = currentTime - lastTime;
+    float deltaTime = elapsedTime.count();
+    PhysicsUpdate(physicsState, forceVector, deltaTime);
+    lastTime = currentTime;
 
 
+    glutPostRedisplay();
+}
 
 int main(int argc, char** argv) {
+    // initial physics
+    physicsState.mass = 1.0f;
+    physicsState.position = cy::Vec3f(0.0, 0.0, 0.0); 
+
     // Initialize GLUT
     glutInit(&argc, argv);
 
@@ -224,6 +254,7 @@ int main(int argc, char** argv) {
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(specialKeyboard);
+    glutIdleFunc(idle);
     glutSpecialUpFunc(specialKeyboardUp);
     glutMouseFunc(handleMouse);
 
@@ -260,7 +291,6 @@ int main(int argc, char** argv) {
     // link shaders
     prog.BuildFiles("vs.txt", "fs.txt");
     lineProg.BuildFiles("arrow_vs.txt", "lightcube_fs.txt");
-
 
 
     // Enter the GLUT event loop
