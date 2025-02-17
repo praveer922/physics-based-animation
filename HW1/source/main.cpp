@@ -29,7 +29,6 @@ float lastClickX, lastClickY;
 bool arrowVisible = false;
 
 // variables for physics
-float dampingFactor = 0.5f;
 struct PhysicsState {
     cy::Vec3f position;
     cy::Vec3f velocity;
@@ -39,6 +38,10 @@ struct PhysicsState {
 
 PhysicsState physicsState;
 cy::Vec3f forceVector;
+float dampingFactor = 0.5f;
+float restitution = 0.8f; // restitution controls bounce energy loss
+cy::Vec2f minBounds = {-22.0f, -17.0f};
+cy::Vec2f maxBounds = {22.0f, 17.0f};
 
 // simulation/render time steps
 auto lastTime = std::chrono::high_resolution_clock::now();
@@ -85,6 +88,18 @@ void PhysicsUpdate(PhysicsState& state, const cy::Vec3f& force, float deltaTime)
     
     // Integrate position: p = p0 + v * dt
     state.position += state.velocity * deltaTime;
+
+    // check for wall boundary
+    for (int i=0; i<2;i++) { // x and y axes
+        if (state.position[i] < minBounds[i]) {
+            state.position[i] = minBounds[i]; // Keep within bounds
+            state.velocity[i] = -state.velocity[i] * restitution; // Reverse velocity with restitution factor
+        }
+        else if (state.position[i] > maxBounds[i]) {
+            state.position[i] = maxBounds[i]; 
+            state.velocity[i] = -state.velocity[i] * restitution;
+        }
+    }
 
 }
 
@@ -138,7 +153,7 @@ void display() {
         };
 
         //update current force vector
-        forceVector = (cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f)) * 10.0f;
+        forceVector = (cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f)) * 20.0f;
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
 
