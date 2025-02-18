@@ -9,6 +9,15 @@
 
 using namespace std;
 
+
+/*
+CONTROLS:
+V -- toggle velocity field
+F -- toggle force field
+R -- reset 
+I -- demo implicit force field
+*/
+
 int num_vertices;
 GLuint VAO;
 GLuint lineVAO;
@@ -50,8 +59,10 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
 cy::Matrix4f proj = cy::Matrix4f::Perspective(40 * 3.14 / 180.0, 800.0 / 600.0, 2.0f, 1000.0f);
 
-// toggles for velocity/force fields
+// toggles for velocity/force fields and implicit mode
 bool velocityFieldOn = false;
+bool forceFieldOn = false;
+bool implicitMode = false;
 
 
 GLfloat lineVertices[] = {
@@ -72,10 +83,107 @@ cy::Vec3f getVelocityMapping(cy::Vec3f worldPos) {
     return cy::Vec3f(0.01f, -0.01f, 0.0f);
 }
 
-
-void PhysicsUpdate(PhysicsState& state, const cy::Vec3f& force, float deltaTime) {
-    if (state.mass <= 0.0f) return; // Avoid division by zero
+cy::Vec3f getForceMapping(const cy::Vec3f& worldPos) {
+    // Compute radial vector
+    cy::Vec3f radial = worldPos;
+    radial.z = 0.0f; // Assuming motion in XY plane
     
+    // Compute distance (radius)
+    float radius = radial.Length();
+    if (radius == 0.0f) return cy::Vec3f(0.0f, 0.0f, 0.0f); // Avoid division by zero
+    
+    // Normalize to get unit radial direction
+    cy::Vec3f radialDir = radial / radius;
+    
+    // Compute tangential direction (rotate 90 degrees counterclockwise in 2D)
+    cy::Vec3f tangentialDir(-radialDir.y, radialDir.x, 0.0f);
+    
+    // Scale force by radius (force magnitude increases with distance)
+    return tangentialDir * radius;
+}
+
+void PhysicsUpdateImplicit(PhysicsState& state, float deltaTime) {
+    if (state.mass <= 0.0f) return; // Avoid division by zero
+
+    float k = 1; // force proportion
+
+    // --- Step 1. Compute the acceleration from the current position.
+    // For a circular field: a(x) = (k/m)*(-y, x, 0)
+    cy::Vec3f a;
+    a.x = (k / state.mass) * (-state.position.y);
+    a.y = (k / state.mass) * ( state.position.x);
+    a.z = 0.0f; // Motion is in the xy-plane
+
+    // --- Step 2. Compute the right-hand side vector:
+    // b = v(t) + deltaTime * a(x(t))
+    cy::Vec3f b = state.velocity + a * deltaTime;
+
+    // --- Step 3. Form the 2x2 matrix A = I - deltaTime^2 * J
+    // where J = [ [0, -k/m], [k/m, 0] ].
+    // Thus, A = [ [1,  deltaTime^2 * (k/m)],
+    //             [-deltaTime^2 * (k/m), 1] ]
+    float factor = deltaTime * deltaTime * (k / state.mass);
+    float A11 = 1.0f;
+    float A12 = factor;
+    float A21 = -factor;
+    float A22 = 1.0f;
+
+    // --- Step 4. Invert the 2x2 matrix A.
+    // Determinant: det = A11*A22 - A12*A21
+    float det = A11 * A22 - A12 * A21; // = 1 + factor^2
+    if (std::fabs(det) < 1e-8f) {
+        std::cerr << "Matrix inversion error: determinant too close to zero.\n";
+        return;
+    }
+
+    // Inverse of A:
+    // A^{-1} = (1/det) * [ [A22, -A12],
+    //                      [-A21, A11] ]
+    float invA11 = A22 / det;
+    float invA12 = -A12 / det;
+    float invA21 = -A21 / det;
+    float invA22 = A11 / det;
+
+    // --- Step 5. Solve for the new velocity components in the xy-plane:
+    // v_new_xy = A^{-1} * b_xy.
+    float newVx = invA11 * b.x + invA12 * b.y;
+    float newVy = invA21 * b.x + invA22 * b.y;
+    
+    // For z, we update explicitly (or assume it remains 0 if motion is strictly planar).
+    float newVz = state.velocity.z;  // Here we leave it unchanged
+
+    // Update the state velocity.
+    state.velocity.x = newVx;
+    state.velocity.y = newVy;
+    state.velocity.z = newVz;
+
+    // --- Step 6. Update the position:
+    // x(t+1) = x(t) + deltaTime * v(t+1)
+    state.position = state.position + state.velocity * deltaTime;
+
+    // check for wall boundary
+    for (int i=0; i<2;i++) { // x and y axes
+        if (state.position[i] < minBounds[i]) {
+            state.position[i] = minBounds[i]; // Keep within bounds
+            state.velocity[i] = -state.velocity[i] * restitution; // Reverse velocity with restitution factor
+        }
+        else if (state.position[i] > maxBounds[i]) {
+            state.position[i] = maxBounds[i]; 
+            state.velocity[i] = -state.velocity[i] * restitution;
+        }
+    }
+}
+
+
+
+
+void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, float deltaTime) {
+    if (state.mass <= 0.0f) return; // Avoid division by zero
+
+    if (forceFieldOn) {
+        force += getForceMapping(state.position);
+    }
+
     // Compute acceleration using Newton's Second Law: F = ma -> a = F/m
     state.acceleration = force / state.mass;
     
@@ -173,15 +281,42 @@ void display() {
 void keyboard(unsigned char key, int x, int y) {
     if (key == 27) {  // ASCII value for the Esc key
         glutLeaveMainLoop();
-    } else if (key == 'v' || key == 'V') {  // Handle both uppercase and lowercase 'v'
+    } else if (key == 'v' || key == 'V') {  
         velocityFieldOn = !velocityFieldOn;
-        if (velocityFieldOn) {
-            cout << "Velocity field is ON." << endl;
-        } else {
-            cout << "Velocity field is OFF." << endl;
-        }
-        
+        forceFieldOn = false;
+        implicitMode = false;
+    } else if (key == 'f' || key == 'F') {  
+        forceFieldOn = !forceFieldOn;
+        velocityFieldOn = false;
+        implicitMode = false;
+    } else if (key == 'i' || key == 'I') {  
+        implicitMode = true;
+        velocityFieldOn = false;
+        forceFieldOn = false;
+
+        // reset variables for implicit mode demo
+        arrowVisible =false;
+        forceVector = {0.0f,0.0f,0.0f};
+        physicsState.acceleration = {0.0f,0.0f, 0.0f};
+        physicsState.velocity = {0.0f,0.0f, 0.0f};
+        physicsState.position = {1.0f, 0.0f, 0.0f};
     }
+
+    if (velocityFieldOn) {
+        cout << "Velocity field is ON." << endl;
+    } else {
+        cout << "Velocity field is OFF." << endl;
+    } 
+
+    if (forceFieldOn) {
+        cout << "Force field is ON." << endl;
+    } else {
+        cout << "Force field is OFF." << endl;
+    }
+
+    if (implicitMode) {
+        cout << "Now in Implicit mode demo." << endl;
+    } 
 }
 
 void specialKeyboard(int key, int x, int y) {
@@ -211,10 +346,13 @@ void specialKeyboardUp(int key, int x, int y) {
 
 void handleMouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        lastClickX = x;
-        lastClickY = y;
-        arrowVisible = true;
-        glutPostRedisplay();
+        if (!implicitMode) {
+            lastClickX = x;
+            lastClickY = y;
+            arrowVisible = true;
+            glutPostRedisplay();
+        }
+        
     }
 }
 
@@ -247,7 +385,12 @@ void idle() {
     auto currentTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> elapsedTime = currentTime - lastTime;
     float deltaTime = elapsedTime.count();
-    PhysicsUpdate(physicsState, forceVector, deltaTime);
+    if (implicitMode) {
+        PhysicsUpdateImplicit(physicsState, deltaTime);
+    } else {
+        PhysicsUpdate(physicsState, forceVector, deltaTime);
+    }
+
     lastTime = currentTime;
 
 
