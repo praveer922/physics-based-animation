@@ -1,3 +1,3 @@
 #! /bin/sh
 
-cd build/; ./hw2 sphere.obj
+cd build/; ./hw2 dragon.obj

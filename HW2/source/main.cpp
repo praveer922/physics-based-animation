@@ -58,6 +58,7 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 // view and proj matrices (since camera is fixed)
 cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
 cy::Matrix4f proj = cy::Matrix4f::Perspective(40 * 3.14 / 180.0, 800.0 / 600.0, 2.0f, 1000.0f);
+float scaleFactor = 1.0f; // scale factor for obj model
 
 // toggles for velocity/force fields and implicit mode
 bool velocityFieldOn = false;
@@ -218,9 +219,10 @@ void display() {
      // Calculate the bounding box
     mesh.ComputeBoundingBox();
     cy::Vec3f center = (mesh.GetBoundMin() + mesh.GetBoundMax()) * 0.5f;
-    // Adjust the model transformation matrix to center the object
-    cy::Matrix4f model = cy::Matrix4f::Translation(-center); 
-    model *= cy::Matrix4f::Translation(physicsState.position);
+    // Adjust the model transformation matrix to center the object (reverse matrix multiplication order)
+    cy::Matrix4f model = cy::Matrix4f::Translation(physicsState.position) * 
+                         cy::Matrix4f::Scale(scaleFactor) *
+                         cy::Matrix4f::Translation(-center);
 
 
     // Your rendering code goes here
@@ -378,6 +380,16 @@ void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
         num_vertices = mesh.NV();
         mesh.ComputeNormals();
     }
+
+    // compute model scale factor
+    if (std::string(modelName) == "dragon.obj") {
+        scaleFactor = 5.0f;
+    } else if (std::string(modelName) == "armadillo.obj") {
+        scaleFactor = 0.01f;
+    } else {
+        scaleFactor = 1.0f;
+    }
+
 }
 
 void idle() {
@@ -418,7 +430,7 @@ int main(int argc, char** argv) {
 
 
     // Create a window with a title
-    glutCreateWindow("HW1");
+    glutCreateWindow("HW2");
 
     // Initialize GLEW
     glewInit();
