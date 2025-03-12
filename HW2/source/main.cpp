@@ -385,7 +385,7 @@ void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
     if (std::string(modelName) == "dragon.obj") {
         scaleFactor = 5.0f;
     } else if (std::string(modelName) == "armadillo.obj") {
-        scaleFactor = 0.01f;
+        scaleFactor = 0.06f;
     } else {
         scaleFactor = 1.0f;
     }
