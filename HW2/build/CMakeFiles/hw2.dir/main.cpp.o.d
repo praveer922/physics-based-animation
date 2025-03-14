@@ -282,5 +282,6 @@ CMakeFiles/hw2.dir/main.cpp.o: \
  /usr/include/X11/keysymdef.h /usr/include/GL/glxext.h \
  /usr/include/inttypes.h \
  /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Camera.h \
+ /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Physics.h \
  /usr/include/c++/11/chrono /usr/include/c++/11/ratio \
  /usr/include/c++/11/ctime /usr/include/c++/11/bits/parse_numbers.h
