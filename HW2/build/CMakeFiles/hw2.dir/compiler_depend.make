@@ -330,6 +330,7 @@ CMakeFiles/hw2.dir/main.cpp.o: /mnt/c/Users/tewar/Documents/Utah/physics-based-a
   /usr/include/X11/keysymdef.h \
   /usr/include/GL/glxext.h \
   /usr/include/inttypes.h \
+  /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Camera.h \
   /usr/include/c++/11/chrono \
   /usr/include/c++/11/ratio \
   /usr/include/c++/11/ctime \
@@ -625,6 +626,8 @@ CMakeFiles/hw2.dir/main.cpp.o: /mnt/c/Users/tewar/Documents/Utah/physics-based-a
 /usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
 
 /usr/include/c++/11/clocale:
+
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Camera.h:
 
 /usr/include/c++/11/bits/ostream.tcc:
 

@@ -4,6 +4,7 @@
 #include "cyTriMesh.h"
 #include "cyMatrix.h"
 #include "cyGL.h"
+#include "Camera.h"
 #include <iostream>
 #include <chrono>
 
@@ -55,9 +56,10 @@ cy::Vec2f maxBounds = {22.0f, 17.0f};
 // simulation/render time steps
 auto lastTime = std::chrono::high_resolution_clock::now();
 
-// view and proj matrices (since camera is fixed)
-cy::Matrix4f view = cy::Matrix4f::View(cy::Vec3f(0.0f, 0.0f, camera_distance), cy::Vec3f(0.0f,0.0f,0.0f), cy::Vec3f(0.0f,1.0f,0.0f));
-cy::Matrix4f proj = cy::Matrix4f::Perspective(40 * 3.14 / 180.0, 800.0 / 600.0, 2.0f, 1000.0f);
+// init camera
+Camera camera(cy::Vec3f(0.0f, 0.0f, camera_distance),
+              cy::Vec3f(0.0f, 0.0f, 0.0f),
+              cy::Vec3f(0.0f, 1.0f, 0.0f));
 float scaleFactor = 1.0f; // scale factor for obj model
 
 // toggles for velocity/force fields and implicit mode
@@ -232,10 +234,9 @@ void display() {
     prog["lightPosLocalSpace"] = lightPosLocalSpace;
     prog["lightRot"] = cy::Matrix4f::RotationY(light_rot_y * 3.14 /180.0) * cy::Matrix4f::RotationZ(light_rot_z * 3.14 /180.0);
     prog["model"] = model;
-    prog["view"] = view;
-    prog["projection"] = proj;
-    prog["cameraViewPos"] = view * cy::Vec3f(0.0f, 0.0f, camera_distance);
-    prog["normalTransform"] = (view*model).GetSubMatrix3();
+    prog["view"] = camera.getViewMatrix();
+    prog["projection"] =  camera.getProjectionMatrix();
+    prog["normalTransform"] = (camera.getViewMatrix()*model).GetSubMatrix3();
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
 
@@ -251,7 +252,7 @@ void display() {
 
         // Define two points in normalized screen space (NDC)
         // Compute the sphere's clip-space coordinate from its world position
-        cy::Vec4f clipPos = proj * view * cy::Vec4f(physicsState.position, 1.0f);
+        cy::Vec4f clipPos = camera.getProjectionMatrix() * camera.getViewMatrix() * cy::Vec4f(physicsState.position, 1.0f);
         // Perform perspective divide to get NDC
         clipPos /= clipPos.w;
         // ndcStart is the (x, y) in normalized device coordinates

@@ -3,7 +3,6 @@
 in vec3 fragNormal;
 in vec3 lightPos;
 in vec3 fragPos;
-in vec3 viewPos;
 layout(location=0) out vec4 color;
 
 void main() {
@@ -22,7 +21,7 @@ void main() {
 
     // specular light (blinn-phong)
     float specularStrength = 0.8;
-    vec3 viewDir = normalize(viewPos - fragPos);
+    vec3 viewDir = normalize(-fragPos);
     vec3 halfwayDir = normalize(lightDir + viewDir);
     vec3 reflectDir = reflect(-lightDir, normalizedNormal);  
     float spec = pow(max(dot(normalizedNormal, halfwayDir), 0.0), 32);

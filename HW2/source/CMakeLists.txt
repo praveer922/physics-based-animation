@@ -2,7 +2,7 @@
 project(hw2)
 
 
-set(SOURCES main.cpp)
+set(SOURCES main.cpp Camera.cpp)
 add_executable(hw2 ${SOURCES})
 
 target_link_libraries(hw2 GL)
