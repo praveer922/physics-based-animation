@@ -12,14 +12,6 @@
 using namespace std;
 
 
-/*
-CONTROLS:
-V -- toggle velocity field
-F -- toggle force field
-R -- reset 
-I -- demo implicit force field
-*/
-
 int num_vertices;
 GLuint VAO;
 GLuint lineVAO;
@@ -34,21 +26,17 @@ bool controlKeyPressed = false;
 cy::TriMesh mesh;
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
-// Variables to store mouse click position
-float lastClickX, lastClickY;
-bool arrowVisible = false;
-
+// init physics variables
 PhysicsState physicsState;
 cy::Vec3f forceVector;
-float dampingFactor = 0.5f;
 
 // simulation/render time steps
 auto lastTime = std::chrono::high_resolution_clock::now();
 
 // init camera
-Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f), // camera at 0,0,50
-              cy::Vec3f(0.0f, 0.0f, 0.0f),
-              cy::Vec3f(0.0f, 1.0f, 0.0f));
+float lastClickX = 400, lastClickY = 300;
+float lastX = 400, lastY = 300;
+Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
 float scaleFactor = 1.0f; // scale factor for obj model
 
 // toggles for velocity/force fields and implicit mode
@@ -82,6 +70,9 @@ void display() {
                          cy::Matrix4f::Scale(scaleFactor) *
                          cy::Matrix4f::Translation(-center);
 
+    cy::Matrix4f view = camera.getLookAtMatrix();
+    cy::Matrix4f proj = camera.getProjectionMatrix();
+
 
     // Your rendering code goes here
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -90,78 +81,65 @@ void display() {
     prog["lightPosLocalSpace"] = lightPosLocalSpace;
     prog["lightRot"] = cy::Matrix4f::RotationY(light_rot_y * 3.14 /180.0) * cy::Matrix4f::RotationZ(light_rot_z * 3.14 /180.0);
     prog["model"] = model;
-    prog["view"] = camera.getViewMatrix();
-    prog["projection"] =  camera.getProjectionMatrix();
-    prog["normalTransform"] = (camera.getViewMatrix()*model).GetSubMatrix3();
+    prog["view"] = view;
+    prog["projection"] =  proj;
+    prog["normalTransform"] = (view*model).GetSubMatrix3();
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
 
-    // DRAW LINE
-    if (arrowVisible)
-    {
-        GLuint lineVBO;
-        glGenVertexArrays(1, &lineVAO);
-        glBindVertexArray(lineVAO);
-
-        glGenBuffers(1, &lineVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-
-        // Define two points in normalized screen space (NDC)
-        // Compute the sphere's clip-space coordinate from its world position
-        cy::Vec4f clipPos = camera.getProjectionMatrix() * camera.getViewMatrix() * cy::Vec4f(physicsState.position, 1.0f);
-        // Perform perspective divide to get NDC
-        clipPos /= clipPos.w;
-        // ndcStart is the (x, y) in normalized device coordinates
-        cy::Vec2f ndcStart(clipPos.x, clipPos.y);
-        cy::Vec2f ndcEnd = screenToNDC(lastClickX,lastClickY, 800, 600);
-        GLfloat lineVertices[] = {
-            ndcStart.x, ndcStart.y,   // Start point in screen space (normalized NDC) 
-            ndcEnd.x, ndcEnd.y  // End point in screen space (normalized NDC) 
-        };
-
-        //update current force vector
-        forceVector = (cy::Vec3f(ndcEnd.x, ndcEnd.y, 0.0f) - cy::Vec3f(ndcStart.x, ndcStart.y, 0.0f)) * 20.0f;
-
-        glBufferData(GL_ARRAY_BUFFER, sizeof(lineVertices), lineVertices, GL_STATIC_DRAW);
-
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
-        glEnableVertexAttribArray(0);
-
-        glBindVertexArray(0); // Unbind the VAO
-        lineProg.Bind();
-        glBindVertexArray(lineVAO);
-        glDrawArrays(GL_LINES, 0, 2); // Draw the line using two points
-        glBindVertexArray(0);
-    }
-
     glutSwapBuffers();
 }
-
 void keyboard(unsigned char key, int x, int y) {
-    if (key == 27) {  // ASCII value for the Esc key
-        glutLeaveMainLoop();
-    } else if (key == 'v' || key == 'V') {  
-        velocityFieldOn = !velocityFieldOn;
-        forceFieldOn = false;
-        implicitMode = false;
-    } else if (key == 'f' || key == 'F') {  
-        forceFieldOn = !forceFieldOn;
-        velocityFieldOn = false;
-        implicitMode = false;
-    } else if (key == 'i' || key == 'I') {  
-        implicitMode = true;
-        velocityFieldOn = false;
-        forceFieldOn = false;
 
-        // reset variables for implicit mode demo
-        arrowVisible =false;
-        forceVector = {0.0f,0.0f,0.0f};
-        physicsState.acceleration = {0.0f,0.0f, 0.0f};
-        physicsState.velocity = {0.0f,0.0f, 0.0f};
-        physicsState.position = {1.0f, 0.0f, 0.0f};
+    if (key == 27) {  // Esc key
+        glutLeaveMainLoop();
+    } /*else if (key == 'w' || key == 'W') {
+        // Move forward
+        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
+        forward.Normalize();
+        cy::Vec3f newPos = camera.getPosition() + forward * speed;
+        camera.setPosition(newPos);
+        camera.setTarget(newPos + forward);
+    } else if (key == 's' || key == 'S') {
+        // Move backward
+        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
+        forward.Normalize();
+        cy::Vec3f newPos = camera.getPosition() - forward * speed;
+        camera.setPosition(newPos);
+        camera.setTarget(newPos + forward);
+    } else if (key == 'a' || key == 'A') {
+        // Strafe left
+        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
+        forward.Normalize();
+        // Compute right vector (world up is (0,1,0))
+        cy::Vec3f right = forward.Cross(cy::Vec3f(0.0f, 1.0f, 0.0f));
+        right.Normalize();
+        cy::Vec3f newPos = camera.getPosition() - right * speed;
+        camera.setPosition(newPos);
+        camera.setTarget(newPos + forward);
+    } else if (key == 'd' || key == 'D') {
+        // Strafe right
+        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
+        forward.Normalize();
+        cy::Vec3f right = forward.Cross(cy::Vec3f(0.0f, 1.0f, 0.0f));
+        right.Normalize();
+        std::cout << "right: " << right.x << ", " << right.y << ", " << right.z << std::endl;
+        right *= speed;
+        std::cout << "rightspeed: " << right.x << ", " << right.y << ", " << right.z << std::endl;
+        cy::Vec3f newPos = camera.getPosition() + (right * speed);
+        std::cout << "newpos: " << newPos.x << ", " << newPos.y << ", " << newPos.z << std::endl;
+        camera.setPosition(newPos);
+        camera.setTarget(newPos + forward);
     }
 
+    std::cout << "New Camera Position: " << camera.getPosition().x << ", " 
+          << camera.getPosition().y << ", " << camera.getPosition().z << std::endl;
+    */
+
+    // Redraw the scene to reflect the camera changes
+    glutPostRedisplay();
 }
+
 
 void specialKeyboard(int key, int x, int y) {
     switch (key) {
@@ -189,17 +167,21 @@ void specialKeyboardUp(int key, int x, int y) {
 }
 
 void handleMouse(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        if (!implicitMode) {
-            lastClickX = x;
-            lastClickY = y;
-            arrowVisible = true;
-            glutPostRedisplay();
-        }
-        
-    }
+    // Update last mouse position
+    lastX = x;
+    lastY = y;
 }
 
+void passiveMouseMotion(int x, int y) {
+    float xoffset = x - lastX;
+    float yoffset = lastY - y; // reversed since y-coordinates range from bottom to top
+    lastX = x;
+    lastY = y;
+
+    camera.processMouseMovement(xoffset, yoffset);
+
+    glutPostRedisplay();
+}
 
 void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
     char * modelName;
@@ -286,12 +268,16 @@ int main(int argc, char** argv) {
     glutIdleFunc(idle);
     glutSpecialUpFunc(specialKeyboardUp);
     glutMouseFunc(handleMouse);
+    glutPassiveMotionFunc(passiveMouseMotion);
 
 
 
     // load models
     loadModel(argc, argv, mesh);
-    //loadArrowModel("arrow.obj");
+    
+
+    //init camera
+    camera.setPerspectiveMatrix(65,800.0f/600.0f, 2.0f, 600.0f);
 
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 

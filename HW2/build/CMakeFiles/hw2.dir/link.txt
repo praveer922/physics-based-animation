@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/hw2.dir/main.cpp.o CMakeFiles/hw2.dir/Camera.cpp.o -o hw2  -lGL -lglut -lGLEW 
+/usr/bin/c++ CMakeFiles/hw2.dir/main.cpp.o -o hw2  -lGL -lglut -lGLEW 

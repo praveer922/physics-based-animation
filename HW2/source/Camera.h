@@ -3,33 +3,88 @@
 
 #include "cyMatrix.h"
 #include "cyVector.h"
+#include "Util.h"
 
 class Camera {
-public:
-    // Constructors
-    Camera();
-    Camera(const cy::Vec3f& position, const cy::Vec3f& target, const cy::Vec3f& up);
+    public:
+        Camera(cy::Vec3f worldSpacePosition) : position(worldSpacePosition), front(0.0f, 0.0f, -1.0f), up(0.0f, 1.0f, 0.0f), 
+        yaw(-90.0f), pitch(0.0f), movementSpeed(2.5f), mouseSensitivity(0.05f),
+        perspectiveMatrix(cy::Matrix4f(1.0)) {
+            update();
+        }
+    
+        void update() {
+            front.x = cos(Util::degreesToRadians(yaw)) * cos(Util::degreesToRadians(pitch));
+            front.y = sin(Util::degreesToRadians(pitch));
+            front.z = sin(Util::degreesToRadians(yaw)) * cos(Util::degreesToRadians(pitch));
+            front.Normalize();
+    
+            right = front.Cross(up);
+            right.Normalize();
+            upVector = right.Cross(front);
+            upVector.Normalize();
+        }
+    
+        void processMouseMovement(float xoffset, float yoffset) {
+            xoffset *= mouseSensitivity;
+            yoffset *= mouseSensitivity;
+            
+            /*
+            if(leftButtonPressed) {
+                
+            } else {
+                position -= front * yoffset;
+            }
+                */
 
-    // Set camera parameters
-    void setPosition(const cy::Vec3f& pos);
-    void setTarget(const cy::Vec3f& target);
-    void setUp(const cy::Vec3f& up);
-    void setPerspective(float fov, float aspect, float nearPlane, float farPlane);
-
-    // Update view matrix based on current position, target, and up vector.
-    void updateView();
-
-    // Getters for matrices
-    const cy::Matrix4f& getViewMatrix() const;
-    const cy::Matrix4f& getProjectionMatrix() const;
+            yaw -= xoffset;
+            pitch -= yoffset;
+    
+            // Prevent flipping when looking too far up or down
+            if (pitch > 89.0f)
+                pitch = 89.0f;
+            if (pitch < -89.0f)
+                pitch = -89.0f;
+    
+            update();
+        }
+    
+        cy::Vec3f getPosition() const { return position; }
+        cy::Vec3f getFront() const { return front; }
+        cy::Matrix4f getLookAtMatrix() const { return cy::Matrix4f::View(position, position+front, upVector); }
+    
+        cy::Matrix4f& getProjectionMatrix() {
+            return perspectiveMatrix;
+        }
+    
+        void setPosition(cy::Vec3f &newPos) {
+            position = newPos;
+        }
+    
+        void setFrontDirection(cy::Vec3f frontDir) {
+            front = frontDir;
+        }
+    
+        void setPerspectiveMatrix(float fov_degrees, float aspect, float znear, float zfar) {
+            perspectiveMatrix = cy::Matrix4f::Perspective(Util::degreesToRadians(fov_degrees), aspect, znear, zfar);
+    
+        }
 
 private:
+    // camera position in world space
     cy::Vec3f position;
-    cy::Vec3f target;
-    cy::Vec3f up;
+    cy::Vec3f front;
+    cy::Vec3f up; // world space up direction
+    cy::Vec3f right;
+    cy::Vec3f upVector; // camera's up vector (in world space)
 
-    cy::Matrix4f viewMatrix;
-    cy::Matrix4f projectionMatrix;
+    cy::Matrix4f perspectiveMatrix;
+
+    float yaw;
+    float pitch;
+
+    float movementSpeed;
+    float mouseSensitivity;
 };
 
 #endif // CAMERA_H

@@ -1,6 +1,4 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/hw2.dir/Camera.cpp.o"
-  "CMakeFiles/hw2.dir/Camera.cpp.o.d"
   "CMakeFiles/hw2.dir/main.cpp.o"
   "CMakeFiles/hw2.dir/main.cpp.o.d"
   "hw2"
