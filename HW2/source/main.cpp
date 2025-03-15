@@ -13,15 +13,14 @@
 using namespace std;
 
 GLuint VAO;
-GLuint lineVAO;
+GLuint planeVAO;
 float rot_x = -90.0f;
 float rot_y = 0.0f;
 float light_rot_y = 0.0f;
 float light_rot_z = 0.0f;
 cy::GLSLProgram prog;
-cy::GLSLProgram lineProg;
+cy::GLSLProgram planeProg;
 bool leftButtonPressed = false;
-bool controlKeyPressed = false;
 cy::TriMesh mesh;
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
@@ -87,6 +86,17 @@ void display() {
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
 
+    planeProg.Bind();
+    planeProg["lightPosLocalSpace"] = lightPosLocalSpace;
+    planeProg["lightRot"] = cy::Matrix4f::RotationY(light_rot_y * 3.14 /180.0) * cy::Matrix4f::RotationZ(light_rot_z * 3.14 /180.0);
+    model = cy::Matrix4f(1.0);
+    planeProg["model"] = model;
+    planeProg["view"] = view;
+    planeProg["projection"] =  proj;
+    planeProg["normalTransform"] = (view*model).GetSubMatrix3();
+    glBindVertexArray(planeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
     glutSwapBuffers();
 }
 void keyboard(unsigned char key, int x, int y) {
@@ -111,19 +121,11 @@ void specialKeyboard(int key, int x, int y) {
             cout << "Shaders recompiled successfully." << endl;
             glutPostRedisplay();
             break;
-        case GLUT_KEY_CTRL_L:
-        case GLUT_KEY_CTRL_R:
-            controlKeyPressed = true;
-            break;
     }
 }
 
 void specialKeyboardUp(int key, int x, int y) {
     switch (key) {
-        case GLUT_KEY_CTRL_L:
-        case GLUT_KEY_CTRL_R:
-            controlKeyPressed = false;
-            break;
     }
 }
 
@@ -204,15 +206,12 @@ int main(int argc, char** argv) {
     glutMouseFunc(handleMouse);
     glutMotionFunc(mouseMotion);
 
-
-
-    // load models
     
-    int num_vertices = Models::loadModel(argc, argv, mesh, scaleFactor);
-    
-
     //init camera
     camera.setPerspectiveMatrix(65,800.0f/600.0f, 2.0f, 600.0f);
+
+    // load model
+    int num_vertices = Models::loadModel(argc, argv, mesh, scaleFactor);
 
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 
@@ -237,10 +236,22 @@ int main(int argc, char** argv) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * mesh.NF() * 3, &mesh.F(0), GL_STATIC_DRAW);
 
+    // set up plane
+    glGenVertexArrays(1, &planeVAO); 
+    glBindVertexArray(planeVAO);
+
+    GLuint planeVBO;
+    glGenBuffers(1, &planeVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * Models::planeVertices.size(), Models::planeVertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+
 
     // link shaders
     prog.BuildFiles("vs.txt", "fs.txt");
-    lineProg.BuildFiles("arrow_vs.txt", "lightcube_fs.txt");
+    planeProg.BuildFiles("plane_vs.txt", "plane_fs.txt");
 
 
     // Enter the GLUT event loop

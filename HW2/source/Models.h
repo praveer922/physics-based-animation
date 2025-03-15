@@ -10,15 +10,16 @@ namespace Models {
     using namespace std;
 
     std::vector<float> planeVertices = {
-        // positions          // texture Coords 
-         5.0f, -1.5f,  5.0f,  1.0f, 1.0f,
-        -5.0f, -1.5f,  5.0f,  0.0f, 1.0f,
-        -5.0f, -1.5f, -5.0f,  0.0f, 0.0f,
+        // positions for a floor at y = -10.0f
+         50.0f, -30.0f,  50.0f,
+        -50.0f, -30.0f,  50.0f,
+        -50.0f, -30.0f, -50.0f,
 
-         5.0f, -1.5f, -5.0f,  1.0f, 0.0f,
-         5.0f, -1.5f,  5.0f,  1.0f, 1.0f,
-        -5.0f, -1.5f, -5.0f,  0.0f, 0.0f
+         50.0f, -30.0f, -50.0f,
+         50.0f, -30.0f,  50.0f,
+        -50.0f, -30.0f, -50.0f
     };
+    
 
     int loadModel(int argc, char** argv, cy::TriMesh & mesh, float & scaleFactor) {
         char * modelName;
