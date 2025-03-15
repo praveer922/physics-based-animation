@@ -332,18 +332,19 @@ CMakeFiles/hw2.dir/main.cpp.o: /mnt/c/Users/tewar/Documents/Utah/physics-based-a
   /usr/include/inttypes.h \
   /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Camera.h \
   /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Util.h \
-  /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Physics.h \
   /usr/include/c++/11/chrono \
   /usr/include/c++/11/ratio \
   /usr/include/c++/11/ctime \
-  /usr/include/c++/11/bits/parse_numbers.h
+  /usr/include/c++/11/bits/parse_numbers.h \
+  /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Physics.h \
+  /mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Models.h
 
+
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Physics.h:
 
 /usr/include/c++/11/ctime:
 
 /usr/include/c++/11/ratio:
-
-/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Physics.h:
 
 /usr/include/inttypes.h:
 
@@ -942,6 +943,8 @@ CMakeFiles/hw2.dir/main.cpp.o: /mnt/c/Users/tewar/Documents/Utah/physics-based-a
 /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h:
 
 /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
+
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW2/source/Models.h:
 
 /usr/include/c++/11/bits/postypes.h:
 

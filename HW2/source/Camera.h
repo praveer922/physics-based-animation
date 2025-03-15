@@ -4,6 +4,7 @@
 #include "cyMatrix.h"
 #include "cyVector.h"
 #include "Util.h"
+#include <chrono>
 
 class Camera {
     public:
@@ -25,21 +26,15 @@ class Camera {
             upVector.Normalize();
         }
     
-        void processMouseMovement(float xoffset, float yoffset) {
+        void processMouseMovement(float xoffset, float yoffset, bool rightButtonPressed) {
             xoffset *= mouseSensitivity;
             yoffset *= mouseSensitivity;
             
-            /*
-            if(leftButtonPressed) {
-                
-            } else {
-                position -= front * yoffset;
-            }
-                */
+            if(rightButtonPressed) {
+                yaw -= xoffset;
+                pitch -= yoffset;
+            } 
 
-            yaw -= xoffset;
-            pitch -= yoffset;
-    
             // Prevent flipping when looking too far up or down
             if (pitch > 89.0f)
                 pitch = 89.0f;
@@ -48,6 +43,27 @@ class Camera {
     
             update();
         }
+
+        void processKeyboard(unsigned char key) {
+            float velocity = movementSpeed;
+        
+            if (key == 'w' || key == 'W') {
+                // Move forward in the direction of the camera's front vector.
+                position = position + front * velocity;
+            } else if (key == 's' || key == 'S') {
+                // Move backward.
+                position = position - front * velocity;
+            } else if (key == 'a' || key == 'A') {
+                // Strafe left: subtract the right vector.
+                position = position - right * velocity;
+            } else if (key == 'd' || key == 'D') {
+                // Strafe right: add the right vector.
+                position = position + right * velocity;
+            }
+
+            update();
+        }
+        
     
         cy::Vec3f getPosition() const { return position; }
         cy::Vec3f getFront() const { return front; }

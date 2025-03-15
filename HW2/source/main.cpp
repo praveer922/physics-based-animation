@@ -6,13 +6,12 @@
 #include "cyGL.h"
 #include "Camera.h"
 #include "Physics.h"
+#include "Models.h"
 #include <iostream>
 #include <chrono>
 
 using namespace std;
 
-
-int num_vertices;
 GLuint VAO;
 GLuint lineVAO;
 float rot_x = -90.0f;
@@ -34,6 +33,7 @@ cy::Vec3f forceVector;
 auto lastTime = std::chrono::high_resolution_clock::now();
 
 // init camera
+bool rightButtonPressed = false;
 float lastClickX = 400, lastClickY = 300;
 float lastX = 400, lastY = 300;
 Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
@@ -93,48 +93,9 @@ void keyboard(unsigned char key, int x, int y) {
 
     if (key == 27) {  // Esc key
         glutLeaveMainLoop();
-    } /*else if (key == 'w' || key == 'W') {
-        // Move forward
-        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
-        forward.Normalize();
-        cy::Vec3f newPos = camera.getPosition() + forward * speed;
-        camera.setPosition(newPos);
-        camera.setTarget(newPos + forward);
-    } else if (key == 's' || key == 'S') {
-        // Move backward
-        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
-        forward.Normalize();
-        cy::Vec3f newPos = camera.getPosition() - forward * speed;
-        camera.setPosition(newPos);
-        camera.setTarget(newPos + forward);
-    } else if (key == 'a' || key == 'A') {
-        // Strafe left
-        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
-        forward.Normalize();
-        // Compute right vector (world up is (0,1,0))
-        cy::Vec3f right = forward.Cross(cy::Vec3f(0.0f, 1.0f, 0.0f));
-        right.Normalize();
-        cy::Vec3f newPos = camera.getPosition() - right * speed;
-        camera.setPosition(newPos);
-        camera.setTarget(newPos + forward);
-    } else if (key == 'd' || key == 'D') {
-        // Strafe right
-        cy::Vec3f forward = camera.getTarget() - camera.getPosition();
-        forward.Normalize();
-        cy::Vec3f right = forward.Cross(cy::Vec3f(0.0f, 1.0f, 0.0f));
-        right.Normalize();
-        std::cout << "right: " << right.x << ", " << right.y << ", " << right.z << std::endl;
-        right *= speed;
-        std::cout << "rightspeed: " << right.x << ", " << right.y << ", " << right.z << std::endl;
-        cy::Vec3f newPos = camera.getPosition() + (right * speed);
-        std::cout << "newpos: " << newPos.x << ", " << newPos.y << ", " << newPos.z << std::endl;
-        camera.setPosition(newPos);
-        camera.setTarget(newPos + forward);
+    } else {
+        camera.processKeyboard(key);
     }
-
-    std::cout << "New Camera Position: " << camera.getPosition().x << ", " 
-          << camera.getPosition().y << ", " << camera.getPosition().z << std::endl;
-    */
 
     // Redraw the scene to reflect the camera changes
     glutPostRedisplay();
@@ -167,54 +128,27 @@ void specialKeyboardUp(int key, int x, int y) {
 }
 
 void handleMouse(int button, int state, int x, int y) {
+
+    if (button == GLUT_RIGHT_BUTTON) {
+        rightButtonPressed = (state == GLUT_DOWN);
+    }
+
     // Update last mouse position
     lastX = x;
     lastY = y;
 }
 
-void passiveMouseMotion(int x, int y) {
+void mouseMotion(int x, int y) {
     float xoffset = x - lastX;
     float yoffset = lastY - y; // reversed since y-coordinates range from bottom to top
     lastX = x;
     lastY = y;
 
-    camera.processMouseMovement(xoffset, yoffset);
+    camera.processMouseMovement(xoffset, yoffset, rightButtonPressed);
 
     glutPostRedisplay();
 }
 
-void loadModel(int argc, char** argv, cy::TriMesh & mesh) {
-    char * modelName;
-
-    // load model
-    if (argc<1) {
-        cout << "No model given. Specify model name in cmd-line arg." << endl;
-        exit(0);
-    } else {
-        modelName = argv[1];
-        cout << "Loading " << modelName << "..." << endl;
-    }
-
-    bool success = mesh.LoadFromFileObj(modelName);
-    if (!success) {
-        cout << "Model loading failed." << endl;
-        exit(0);
-    } else {
-        cout << "Loaded model successfully." << endl;
-        num_vertices = mesh.NV();
-        mesh.ComputeNormals();
-    }
-
-    // compute model scale factor
-    if (std::string(modelName) == "dragon.obj") {
-        scaleFactor = 5.0f;
-    } else if (std::string(modelName) == "armadillo.obj") {
-        scaleFactor = 0.06f;
-    } else {
-        scaleFactor = 1.0f;
-    }
-
-}
 
 void idle() {
     // first, update physics
@@ -268,12 +202,13 @@ int main(int argc, char** argv) {
     glutIdleFunc(idle);
     glutSpecialUpFunc(specialKeyboardUp);
     glutMouseFunc(handleMouse);
-    glutPassiveMotionFunc(passiveMouseMotion);
+    glutMotionFunc(mouseMotion);
 
 
 
     // load models
-    loadModel(argc, argv, mesh);
+    
+    int num_vertices = Models::loadModel(argc, argv, mesh, scaleFactor);
     
 
     //init camera
