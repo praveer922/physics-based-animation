@@ -38,16 +38,7 @@ float lastX = 400, lastY = 300;
 Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
 float scaleFactor = 1.0f; // scale factor for obj model
 
-// toggles for velocity/force fields and implicit mode
-bool velocityFieldOn = false;
-bool forceFieldOn = false;
-bool implicitMode = false;
 
-
-GLfloat lineVertices[] = {
-    0.0f, 0.0f,   // Start point in screen space (normalized NDC) for (400, 300)
-    0.0f, 0.333f  // End point in screen space (normalized NDC) for (400, 400)
-};
 
 cy::Vec2f screenToNDC(int screenX, int screenY, int screenWidth, int screenHeight) {
     cy::Vec2f ndc;
@@ -123,12 +114,6 @@ void specialKeyboard(int key, int x, int y) {
             break;
     }
 }
-
-void specialKeyboardUp(int key, int x, int y) {
-    switch (key) {
-    }
-}
-
 void handleMouse(int button, int state, int x, int y) {
 
     if (button == GLUT_RIGHT_BUTTON) {
@@ -157,11 +142,9 @@ void idle() {
     auto currentTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> elapsedTime = currentTime - lastTime;
     float deltaTime = elapsedTime.count();
-    if (implicitMode) {
-        Physics::PhysicsUpdateImplicit(physicsState, deltaTime);
-    } else {
-        Physics::PhysicsUpdate(physicsState, forceVector, deltaTime);
-    }
+    
+    cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
+    Physics::PhysicsUpdate(physicsState, gravityForce, deltaTime);
 
     lastTime = currentTime;
 
@@ -202,7 +185,6 @@ int main(int argc, char** argv) {
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(specialKeyboard);
     glutIdleFunc(idle);
-    glutSpecialUpFunc(specialKeyboardUp);
     glutMouseFunc(handleMouse);
     glutMotionFunc(mouseMotion);
 

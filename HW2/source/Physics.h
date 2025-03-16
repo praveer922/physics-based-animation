@@ -14,8 +14,8 @@ struct PhysicsState {
 
 // Global boundaries and restitution factor.
 float restitution = 0.8f; // restitution controls bounce energy loss
-cy::Vec2f minBounds = {-22.0f, -17.0f};
-cy::Vec2f maxBounds = {22.0f, 17.0f};
+cy::Vec3f minBounds = {-47.0f, -25.0f, -47.0f};
+cy::Vec3f maxBounds = {47.0f, 25.0f, 47.0f};
 
 
 namespace Physics {
@@ -105,8 +105,8 @@ inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, float deltaTime)
     // Integrate position: p = p0 + v * dt
     state.position += state.velocity * deltaTime;
 
-    // Check for wall boundary on the x and y axes.
-    for (int i = 0; i < 2; i++) {
+    // Check for wall boundary on the x, y, and z axes (3D box)
+    for (int i = 0; i < 3; i++) {
         if (state.position[i] < minBounds[i]) {
             state.position[i] = minBounds[i];
             state.velocity[i] = -state.velocity[i] * restitution;
