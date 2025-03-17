@@ -56,13 +56,15 @@ void display() {
     mesh.ComputeBoundingBox();
     cy::Vec3f center = (mesh.GetBoundMin() + mesh.GetBoundMax()) * 0.5f;
     // Adjust the model transformation matrix to center the object (reverse matrix multiplication order)
+    cy::Matrix4f angularRotation = cy::Matrix4f(physicsState.orientation);
     cy::Matrix4f model = cy::Matrix4f::Translation(physicsState.position) * 
+                         angularRotation *
                          cy::Matrix4f::Scale(scaleFactor) *
                          cy::Matrix4f::Translation(-center);
 
-    cy::Matrix4f angularRotation = cy::Matrix4f(physicsState.orientation);
 
-    model = angularRotation * model;
+
+    //model = angularRotation * model;
 
     cy::Matrix4f view = camera.getLookAtMatrix();
     cy::Matrix4f proj = camera.getProjectionMatrix();
@@ -163,7 +165,8 @@ int main(int argc, char** argv) {
     physicsState.mass = 1.0f;
     physicsState.position = cy::Vec3f(0.0, 0.0, 0.0); 
     physicsState.orientation.SetIdentity();
-    physicsState.angularVelocity = cy::Vec3f(0.0f,1.5f,0.0f);
+    physicsState.orientation.SetRotationZ(Util::degreesToRadians(35));
+    physicsState.angularVelocity = cy::Vec3f(0.0f);
 
     // Initialize GLUT
     glutInit(&argc, argv);
