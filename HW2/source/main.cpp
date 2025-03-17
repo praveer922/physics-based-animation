@@ -60,6 +60,10 @@ void display() {
                          cy::Matrix4f::Scale(scaleFactor) *
                          cy::Matrix4f::Translation(-center);
 
+    cy::Matrix4f angularRotation = cy::Matrix4f(physicsState.orientation);
+
+    model = angularRotation * model;
+
     cy::Matrix4f view = camera.getLookAtMatrix();
     cy::Matrix4f proj = camera.getProjectionMatrix();
 
@@ -90,6 +94,8 @@ void display() {
 
     glutSwapBuffers();
 }
+
+
 void keyboard(unsigned char key, int x, int y) {
 
     if (key == 27) {  // Esc key
@@ -156,6 +162,8 @@ int main(int argc, char** argv) {
     // initial physics
     physicsState.mass = 1.0f;
     physicsState.position = cy::Vec3f(0.0, 0.0, 0.0); 
+    physicsState.orientation.SetIdentity();
+    physicsState.angularVelocity = cy::Vec3f(0.0f,1.5f,0.0f);
 
     // Initialize GLUT
     glutInit(&argc, argv);
