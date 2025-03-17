@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cmath>
+#include "Util.h"
 
 
 struct PhysicsState {
@@ -112,6 +113,25 @@ void ProcessFloorCollision(PhysicsState& state, const std::vector<cy::Vec3f>& ve
             }
         }
     }
+}
+
+
+void OnMouseClick(int mouseX, int mouseY, cy::Vec3f& externalTorque, PhysicsState & physicsState) {
+    cy::Vec3f hitPoint = Util::screenToWorldSpaceXPlane(mouseX,mouseY,800,600);
+
+    std::cout << "Mouse click: " << hitPoint.x << "," << hitPoint.y << "," << hitPoint.z << std::endl;
+    
+    // Compute the lever arm from the object's center of mass.
+    cy::Vec3f r = hitPoint - physicsState.position;
+    
+    // Choose a force impulse to simulate the collision.
+    float forceMagnitude = 10000000000.0f; // Adjust this value to your needs.
+    cy::Vec3f forceDir = r.GetNormalized();
+    cy::Vec3f forceImpulse = forceDir * forceMagnitude;
+    
+    // Calculate the torque: τ = r × F.
+    externalTorque = r.Cross(forceImpulse);
+    std::cout << "External torque: " << externalTorque.x << "," << externalTorque.y << "," << externalTorque.z << std::endl;
 }
 
 

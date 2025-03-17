@@ -26,7 +26,7 @@ cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
 // init physics variables
 PhysicsState physicsState;
-cy::Vec3f forceVector;
+cy::Vec3f externalTorque(0.0f,0.0f,0.0f);
 std::vector<cy::Vec3f> verticesWorldSpace;
 
 // simulation/render time steps
@@ -38,17 +38,6 @@ float lastClickX = 400, lastClickY = 300;
 float lastX = 400, lastY = 300;
 Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
 float scaleFactor = 1.0f; // scale factor for obj model
-
-
-
-cy::Vec2f screenToNDC(int screenX, int screenY, int screenWidth, int screenHeight) {
-    cy::Vec2f ndc;
-    // Convert X from screen space to NDC (-1 to 1)
-    ndc.x = 2.0f * screenX / screenWidth - 1.0f;
-    // Convert Y from screen space to NDC (1 to -1)
-    ndc.y = 1.0f - 2.0f * screenY / screenHeight;
-    return ndc;
-}
 
 
 void display() {
@@ -133,6 +122,11 @@ void handleMouse(int button, int state, int x, int y) {
         rightButtonPressed = (state == GLUT_DOWN);
     }
 
+    // Check for left mouse button click
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
+        Physics::OnMouseClick(x,y,externalTorque,physicsState);
+    }
+
     // Update last mouse position
     lastX = x;
     lastY = y;
@@ -157,10 +151,10 @@ void idle() {
     float deltaTime = elapsedTime.count();
     
     cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
-    cy::Vec3f torque(0.0f,0.0f,0.0f);
 
     Physics::ProcessFloorCollision(physicsState, verticesWorldSpace);
-    Physics::PhysicsUpdate(physicsState, gravityForce, torque, deltaTime);
+    Physics::PhysicsUpdate(physicsState, gravityForce, externalTorque, deltaTime);
+    externalTorque = cy::Vec3f(0.0f,0.0f,0.0f);
 
     lastTime = currentTime;
 
