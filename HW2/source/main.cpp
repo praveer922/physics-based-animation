@@ -152,7 +152,8 @@ void idle() {
     float deltaTime = elapsedTime.count();
     
     cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
-    Physics::PhysicsUpdate(physicsState, gravityForce, deltaTime);
+    cy::Vec3f torque(0.0f,0.0f,0.0f);
+    Physics::PhysicsUpdate(physicsState, gravityForce, torque, deltaTime);
 
     lastTime = currentTime;
 

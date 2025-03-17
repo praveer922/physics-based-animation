@@ -23,17 +23,22 @@ cy::Vec3f maxBounds = {47.0f, 25.0f, 47.0f};
 namespace Physics {
 
 // This function uses an explicit integration method for updating the physics state.
-inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, float deltaTime) {
+inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, cy::Vec3f torque, float deltaTime) {
     if (state.mass <= 0.0f) return; // Avoid division by zero
 
     // Compute acceleration using Newton's Second Law: F = ma -> a = F/m
     cy::Vec3f acceleration = force * (1.0f / state.mass);
     
     // Integrate velocity: v = v0 + a * dt
-    state.velocity += acceleration * deltaTime;
-    
+    state.velocity += acceleration * deltaTime;    
     // Integrate position: p = p0 + v * dt
     state.position += state.velocity * deltaTime;
+
+
+    // Rotational dynamics (assuming an identity inertia tensor):
+    cy::Vec3f angularAcceleration = torque;
+    // Integrate angular velocity: ω = ω0 + α * dt
+    state.angularVelocity += angularAcceleration * deltaTime;
 
     // Compute incremental rotation from angular velocity
     float angularSpeed = state.angularVelocity.Length();
