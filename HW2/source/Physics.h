@@ -50,7 +50,7 @@ inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, cy::Vec3f torque
         // Update orientation
         state.orientation = incrementalRotation * state.orientation;
     }
-
+    
     // Check for wall boundary on the x, y, and z axes (3D box)
     for (int i = 0; i < 3; i++) {
         if (state.position[i] < minBounds[i]) {
@@ -62,6 +62,58 @@ inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, cy::Vec3f torque
         }
     }
 }
+
+// Process collisions for each vertex of the model
+// vertices: a collection of the model's vertices in world space
+void ProcessFloorCollision(PhysicsState& state, const std::vector<cy::Vec3f>& vertices) {
+    // For a horizontal floor at y = 0, the contact normal is upward.
+    const cy::Vec3f normal(0.0f, 1.0f, 0.0f);
+    const float floorHeight = minBounds[1];
+
+    // Iterate over each vertex in the model
+    for (const auto& worldVertex : vertices) {
+        // Check if the vertex is penetrating the floor.
+        if (worldVertex.y < floorHeight) {
+            // Compute penetration depth.
+            float penetration = floorHeight - worldVertex.y;
+
+            // Compute the lever arm from the center of mass to the contact point.
+            cy::Vec3f r = worldVertex - state.position;
+
+            // Compute the velocity at the contact point.
+            // Linear velocity plus the rotational contribution: v = v_cm + ω × r
+            cy::Vec3f v_contact = state.velocity + state.angularVelocity.Cross(r);
+
+            // Only process if the vertex is moving into the floor.
+            float v_rel = v_contact.Dot(normal);
+            if (v_rel < 0.0f) {
+                // Compute the impulse magnitude.
+                // The formula for impulse magnitude is:
+                //   j = -(1 + restitution) * (v_rel) / (1/m + n · ((r x n) x r))
+                // With an identity inertia tensor, (I^-1 * (r x n)) simplifies to (r x n),
+                // so the denominator becomes: 1/m + |r x n|^2.
+                float denominator = (1.0f / state.mass) + (r.Cross(normal)).LengthSquared();
+                float j = -(1.0f + restitution) * v_rel / denominator;
+
+                // The impulse vector is along the contact normal.
+                cy::Vec3f impulse = j * normal;
+
+                // Apply the impulse to the linear velocity.
+                state.velocity += impulse / state.mass;
+
+                // Apply the impulse to the angular velocity.
+                // The change in angular velocity is given by: Δω = I⁻¹ * (r × impulse).
+                // With I⁻¹ assumed to be the identity, it's just r × impulse.
+                state.angularVelocity += r.Cross(impulse);
+
+                // Optionally: Adjust the position to reduce interpenetration.
+                // This is a simple positional correction along the normal.
+                state.position.y += penetration;
+            }
+        }
+    }
+}
+
 
 } // namespace Physics
 

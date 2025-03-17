@@ -27,6 +27,7 @@ cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 // init physics variables
 PhysicsState physicsState;
 cy::Vec3f forceVector;
+std::vector<cy::Vec3f> verticesWorldSpace;
 
 // simulation/render time steps
 auto lastTime = std::chrono::high_resolution_clock::now();
@@ -64,7 +65,11 @@ void display() {
 
 
 
-    //model = angularRotation * model;
+    //update verticesWorldSpace
+    for (auto& vertex : verticesWorldSpace) {
+        vertex = cy::Vec3f(model * cy::Vec4f(vertex,1.0f));
+    }
+
 
     cy::Matrix4f view = camera.getLookAtMatrix();
     cy::Matrix4f proj = camera.getProjectionMatrix();
@@ -153,6 +158,8 @@ void idle() {
     
     cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
     cy::Vec3f torque(0.0f,0.0f,0.0f);
+
+    Physics::ProcessFloorCollision(physicsState, verticesWorldSpace);
     Physics::PhysicsUpdate(physicsState, gravityForce, torque, deltaTime);
 
     lastTime = currentTime;
@@ -206,6 +213,8 @@ int main(int argc, char** argv) {
 
     // load model
     int num_vertices = Models::loadModel(argc, argv, mesh, scaleFactor);
+    verticesWorldSpace.resize(num_vertices);
+    
 
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 
