@@ -108,8 +108,14 @@ namespace Models {
             Tetrahedron tet;
             int tetIndex;
             inFile >> tetIndex >> tet.v[0] >> tet.v[1] >> tet.v[2] >> tet.v[3];
+            // Convert from 1-indexed to 0-indexed
+            tet.v[0]--;
+            tet.v[1]--;
+            tet.v[2]--;
+            tet.v[3]--;
             tets.push_back(tet);
         }
+
         return true;
     }
 
@@ -138,7 +144,6 @@ namespace Models {
             return c < other.c;
         }
     };
-    
 
     std::vector<Face> extractSurfaceFaces(const std::vector<Models::Tetrahedron> &tets) {
         std::vector<Face> allFaces;
@@ -172,8 +177,6 @@ namespace Models {
         
         return surfaceFaces;
     }
-
-
 
 } // namespace models
 

@@ -218,7 +218,49 @@ int main(int argc, char** argv) {
 
     // Extract the surface triangles from the tetrahedral mesh
     std::vector<Models::Face> surfaceFaces = Models::extractSurfaceFaces(tetrahedra);
+
+    std::cout << "No. of surface faces = " << surfaceFaces.size() << std::endl;
+
+    // Build the surface mesh data for OpenGL rendering
+    std::vector<unsigned int> surfaceIndices;
+
+
+    // Populate the indices using the surfaceFaces
+    for (const auto &face : surfaceFaces) {
+        surfaceIndices.push_back(face.a);
+        surfaceIndices.push_back(face.b);
+        surfaceIndices.push_back(face.c);
+    }
+
+    std::vector<cy::Vec3f> surfaceNormals(nodes.size(), cy::Vec3f(0.0f, 0.0f, 0.0f));
+
+    // Loop through each face and add its normal to its vertices.
+    for (const auto &face : surfaceFaces) {
+        // Retrieve the three vertices for the face.
+        cy::Vec3f v0 = nodes[face.a];
+        cy::Vec3f v1 = nodes[face.b];
+        cy::Vec3f v2 = nodes[face.c];
+        
+        // Compute the face's normal.
+        cy::Vec3f edge1 = v1 - v0;
+        cy::Vec3f edge2 = v2 - v0;
+        cy::Vec3f faceNormal = edge1.Cross(edge2);
+        faceNormal.Normalize();  // Normalize the face normal.
+        
+        // Accumulate the face normal into each vertex's normal.
+        surfaceNormals[face.a] += faceNormal;
+        surfaceNormals[face.b] += faceNormal;
+        surfaceNormals[face.c] += faceNormal;
+    }
+
+    // Normalize all the per-vertex normals (to get the average direction).
+    for (size_t i = 0; i < surfaceNormals.size(); i++) {
+        float len = surfaceNormals[i].Length();
+        if (len > 0.0f)
+            surfaceNormals[i] /= len;
+    }
     
+        
 
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 
@@ -227,21 +269,27 @@ int main(int argc, char** argv) {
     GLuint normalVBO;
     glGenBuffers(1, &normalVBO);
     glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cy::Vec3f) * mesh.NV(), &mesh.VN(0), GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(cy::Vec3f) * mesh.NV(), &mesh.VN(0), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, surfaceNormals.size() * sizeof(cy::Vec3f), surfaceNormals.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(1); // Assuming attribute index 1 for normals
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     GLuint VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cy::Vec3f)*num_vertices, &mesh.V(0), GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(cy::Vec3f)*num_vertices, &mesh.V(0), GL_STATIC_DRAW);
+    //glEnableVertexAttribArray(0);
+    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glBufferData(GL_ARRAY_BUFFER, nodes.size() * sizeof(cy::Vec3f), nodes.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
 
     GLuint EBO;
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * mesh.NF() * 3, &mesh.F(0), GL_STATIC_DRAW);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * mesh.NF() * 3, &mesh.F(0), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, surfaceIndices.size() * sizeof(unsigned int), surfaceIndices.data(), GL_STATIC_DRAW);
 
     // set up plane
     glGenVertexArrays(1, &planeVAO); 
