@@ -1,0 +1,3 @@
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW3/build/CMakeFiles/hw3.dir
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW3/build/CMakeFiles/edit_cache.dir
+/mnt/c/Users/tewar/Documents/Utah/physics-based-animation/HW3/build/CMakeFiles/rebuild_cache.dir

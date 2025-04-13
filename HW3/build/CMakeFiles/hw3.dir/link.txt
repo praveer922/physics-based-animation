@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/hw3.dir/main.cpp.o -o hw3  -lGL -lglut -lGLEW 

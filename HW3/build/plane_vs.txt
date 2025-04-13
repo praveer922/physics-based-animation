@@ -1,0 +1,22 @@
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform mat4 lightRot;
+uniform mat3 normalTransform;
+uniform vec3 lightPosLocalSpace;
+
+out vec3 fragNormal;
+out vec3 lightPos;
+out vec3 fragPos;
+
+void main()
+{
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    fragNormal = mat3(transpose(inverse(normalTransform))) * vec3(0.0,1.0,0.0);
+    lightPos = vec3(view * model* lightRot* vec4(lightPosLocalSpace, 1));
+    fragPos = vec3(view * model * vec4(aPos,1));
+}
