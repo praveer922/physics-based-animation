@@ -21,7 +21,8 @@ float light_rot_z = 0.0f;
 cy::GLSLProgram prog;
 cy::GLSLProgram planeProg;
 bool leftButtonPressed = false;
-cy::TriMesh mesh;
+int num_vertices;
+cy::Vec3f centroid(0.0f, 0.0f, 0.0f);
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
 // init physics variables
@@ -37,20 +38,16 @@ bool rightButtonPressed = false;
 float lastClickX = 400, lastClickY = 300;
 float lastX = 400, lastY = 300;
 Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
-float scaleFactor = 1.0f; // scale factor for obj model
+float scaleFactor = 0.06f;; // scale factor for armadillo model
 
 
 void display() {
-    // set uniforms    
-     // Calculate the bounding box
-    mesh.ComputeBoundingBox();
-    cy::Vec3f center = (mesh.GetBoundMin() + mesh.GetBoundMax()) * 0.5f;
     // Adjust the model transformation matrix to center the object (reverse matrix multiplication order)
     cy::Matrix4f angularRotation = cy::Matrix4f(physicsState.orientation);
     cy::Matrix4f model = cy::Matrix4f::Translation(physicsState.position) * 
                          angularRotation *
                          cy::Matrix4f::Scale(scaleFactor) *
-                         cy::Matrix4f::Translation(-center);
+                         cy::Matrix4f::Translation(-centroid);
 
 
 
@@ -75,7 +72,7 @@ void display() {
     prog["projection"] =  proj;
     prog["normalTransform"] = (view*model).GetSubMatrix3();
     glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, mesh.NF() * 3, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, num_vertices, GL_UNSIGNED_INT, 0);
 
     planeProg.Bind();
     planeProg["lightPosLocalSpace"] = lightPosLocalSpace;
@@ -152,8 +149,8 @@ void idle() {
     
     cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
 
-    Physics::ProcessFloorCollision(physicsState, verticesWorldSpace);
-    Physics::PhysicsUpdate(physicsState, gravityForce, externalTorque, deltaTime);
+    //Physics::ProcessFloorCollision(physicsState, verticesWorldSpace);
+    //Physics::PhysicsUpdate(physicsState, gravityForce, externalTorque, deltaTime);
     externalTorque = cy::Vec3f(0.0f,0.0f,0.0f);
 
     lastTime = currentTime;
@@ -205,15 +202,12 @@ int main(int argc, char** argv) {
     //init camera
     camera.setPerspectiveMatrix(65,800.0f/600.0f, 2.0f, 600.0f);
 
-    // load model
-    int num_vertices = Models::loadModel(argc, argv, mesh, scaleFactor);
-    verticesWorldSpace.resize(num_vertices);
-
+    // load volumetric model
     std::vector<cy::Vec3f> nodes;
     std::vector<Models::Tetrahedron> tetrahedra;
 
-    // Load your volumetric model
-    if (!Models::loadNodes("armadillo_50k_tet.node", nodes)) { /* error handling */ }
+
+    if (!Models::loadNodes("armadillo_50k_tet.node", nodes, centroid)) { /* error handling */ }
     if (!Models::loadTetrahedra("armadillo_50k_tet.ele", tetrahedra)) { /* error handling */ }
 
     // Extract the surface triangles from the tetrahedral mesh
@@ -231,6 +225,10 @@ int main(int argc, char** argv) {
         surfaceIndices.push_back(face.b);
         surfaceIndices.push_back(face.c);
     }
+
+    num_vertices = surfaceIndices.size();
+    verticesWorldSpace.resize(num_vertices);
+
 
     std::vector<cy::Vec3f> surfaceNormals(nodes.size(), cy::Vec3f(0.0f, 0.0f, 0.0f));
 

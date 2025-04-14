@@ -63,7 +63,7 @@ namespace Models {
         int v[4]; // indices to the node list
     };
     
-    bool loadNodes(const std::string &nodeFile, std::vector<cy::Vec3f>& nodes) {
+    bool loadNodes(const std::string &nodeFile, std::vector<cy::Vec3f>& nodes, cy::Vec3f &centroid) {
         std::ifstream inFile(nodeFile);
         if (!inFile) {
             std::cerr << "Cannot open node file " << nodeFile << std::endl;
@@ -83,6 +83,12 @@ namespace Models {
             // Optionally read extra attributes...
             nodes.push_back(node);
         }
+
+        for (const auto &p : nodes) {
+            centroid += p;
+        }
+        centroid /= (float)nodes.size();
+        
         return true;
     }
     
