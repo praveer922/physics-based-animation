@@ -13,6 +13,7 @@
 using namespace std;
 
 GLuint VAO;
+GLuint VBO;
 GLuint planeVAO;
 float rot_x = -90.0f;
 float rot_y = 0.0f;
@@ -22,12 +23,14 @@ cy::GLSLProgram prog;
 cy::GLSLProgram planeProg;
 bool leftButtonPressed = false;
 int num_vertices;
+std::vector<cy::Vec3f> nodes;
 cy::Vec3f centroid(0.0f, 0.0f, 0.0f);
 cy::Vec3f lightPosLocalSpace = cy::Vec3f(15.0, -15.0, 15.0);
 
 // init physics variables
-PhysicsState physicsState;
-cy::Vec3f externalTorque(0.0f,0.0f,0.0f);
+
+std::vector<MassPoint> mpoints;
+std::vector<Spring> springs;
 std::vector<cy::Vec3f> verticesWorldSpace;
 
 // simulation/render time steps
@@ -40,21 +43,13 @@ float lastX = 400, lastY = 300;
 Camera camera(cy::Vec3f(0.0f, 0.0f, 50.0f)); // camera at 0,0,50
 float scaleFactor = 0.06f;; // scale factor for armadillo model
 
+cy::Vec3f externalForce(0.0f,0.0f,0.0f);
+
 
 void display() {
     // Adjust the model transformation matrix to center the object (reverse matrix multiplication order)
-    cy::Matrix4f angularRotation = cy::Matrix4f(physicsState.orientation);
-    cy::Matrix4f model = cy::Matrix4f::Translation(physicsState.position) * 
-                         angularRotation *
-                         cy::Matrix4f::Scale(scaleFactor) *
+    cy::Matrix4f model = cy::Matrix4f::Scale(scaleFactor) *
                          cy::Matrix4f::Translation(-centroid);
-
-
-
-    //update verticesWorldSpace
-    for (auto& vertex : verticesWorldSpace) {
-        vertex = cy::Vec3f(model * cy::Vec4f(vertex,1.0f));
-    }
 
 
     cy::Matrix4f view = camera.getLookAtMatrix();
@@ -90,7 +85,6 @@ void display() {
 
 
 void keyboard(unsigned char key, int x, int y) {
-
     if (key == 27) {  // Esc key
         glutLeaveMainLoop();
     } else {
@@ -121,7 +115,7 @@ void handleMouse(int button, int state, int x, int y) {
 
     // Check for left mouse button click
     if (button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
-        Physics::OnMouseClick(x,y,externalTorque,physicsState);
+        Physics::OnMouseClick(x,y,externalForce);
     }
 
     // Update last mouse position
@@ -146,12 +140,23 @@ void idle() {
     auto currentTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> elapsedTime = currentTime - lastTime;
     float deltaTime = elapsedTime.count();
-    
-    cy::Vec3f gravityForce = cy::Vec3f(0.0f, -9.8f * physicsState.mass, 0.0f);
 
     //Physics::ProcessFloorCollision(physicsState, verticesWorldSpace);
-    //Physics::PhysicsUpdate(physicsState, gravityForce, externalTorque, deltaTime);
-    externalTorque = cy::Vec3f(0.0f,0.0f,0.0f);
+    Physics::PhysicsUpdate(mpoints, springs, externalForce, deltaTime);
+    externalForce = {0.0f,0.0f,0.0f};
+    for (size_t i = 0; i < mpoints.size(); ++i) {
+        nodes[i] = mpoints[i].position;
+    }
+    
+    // now push that updated block of memory into the VBO:
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    // offset = 0, size = whole buffer
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        0,
+        nodes.size() * sizeof(cy::Vec3f),
+        nodes.data()
+    );
 
     lastTime = currentTime;
 
@@ -160,13 +165,6 @@ void idle() {
 }
 
 int main(int argc, char** argv) {
-    // initial physics
-    physicsState.mass = 1.0f;
-    physicsState.position = cy::Vec3f(0.0, 0.0, 0.0); 
-    physicsState.orientation.SetIdentity();
-    physicsState.orientation.SetRotationZ(Util::degreesToRadians(35));
-    physicsState.angularVelocity = cy::Vec3f(0.0f);
-
     // Initialize GLUT
     glutInit(&argc, argv);
 
@@ -203,12 +201,12 @@ int main(int argc, char** argv) {
     camera.setPerspectiveMatrix(65,800.0f/600.0f, 2.0f, 600.0f);
 
     // load volumetric model
-    std::vector<cy::Vec3f> nodes;
     std::vector<Models::Tetrahedron> tetrahedra;
 
 
     if (!Models::loadNodes("armadillo_50k_tet.node", nodes, centroid)) { /* error handling */ }
     if (!Models::loadTetrahedra("armadillo_50k_tet.ele", tetrahedra)) { /* error handling */ }
+
 
     // Extract the surface triangles from the tetrahedral mesh
     std::vector<Models::Face> surfaceFaces = Models::extractSurfaceFaces(tetrahedra);
@@ -258,8 +256,6 @@ int main(int argc, char** argv) {
             surfaceNormals[i] /= len;
     }
     
-        
-
     // set up VAO and VBO and EBO and NBO
     glGenVertexArrays(1, &VAO); 
     glBindVertexArray(VAO);
@@ -272,13 +268,16 @@ int main(int argc, char** argv) {
     glEnableVertexAttribArray(1); // Assuming attribute index 1 for normals
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    GLuint VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(cy::Vec3f)*num_vertices, &mesh.V(0), GL_STATIC_DRAW);
-    //glEnableVertexAttribArray(0);
-    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glBufferData(GL_ARRAY_BUFFER, nodes.size() * sizeof(cy::Vec3f), nodes.data(), GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, nodes.size() * sizeof(cy::Vec3f), nodes.data(), GL_STATIC_DRAW);
+    // allocate an empty buffer of the right size, with DYNAMIC_DRAW
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        nodes.size() * sizeof(cy::Vec3f),
+        nullptr,
+        GL_DYNAMIC_DRAW
+    );
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
@@ -300,11 +299,71 @@ int main(int argc, char** argv) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-
-
     // link shaders
     prog.BuildFiles("vs.txt", "fs.txt");
     planeProg.BuildFiles("plane_vs.txt", "plane_fs.txt");
+
+
+    // physics stuff: set up mass points and springs
+    mpoints.reserve(nodes.size());
+
+    for (auto &p : nodes) {
+        MassPoint mp;
+        mp.position = p;
+        mp.mass     = 1.0f;
+        mp.fixed    = false;
+        mpoints.push_back(mp);
+    }
+
+    // say you want the top 1/3 fixed:
+    const float fraction = 1.0f/3.0f;
+
+    // first find min and max y
+    float yMin = mpoints[0].position.y;
+    float yMax = yMin;
+    for (auto &mp : mpoints) {
+        yMin = std::min(yMin, mp.position.y);
+        yMax = std::max(yMax, mp.position.y);
+    }
+    // cutoff: everything above (1–fraction) up from yMin → fix the top fraction
+    float cutoff = yMin + (yMax - yMin)*(1.0f - fraction);
+
+    for (auto &mp : mpoints) {
+        if (mp.position.y >= cutoff) {
+            mp.fixed = true;
+        }
+    }
+
+    std::vector<std::pair<int,int>> rawEdges;
+    rawEdges.reserve(tetrahedra.size()*6);
+
+    for (auto &T : tetrahedra) {
+        int v[4] = {T.v[0], T.v[1], T.v[2], T.v[3]};
+        // the 6 edges
+        rawEdges.emplace_back(std::min(v[0],v[1]), std::max(v[0],v[1]));
+        rawEdges.emplace_back(std::min(v[0],v[2]), std::max(v[0],v[2]));
+        rawEdges.emplace_back(std::min(v[0],v[3]), std::max(v[0],v[3]));
+        rawEdges.emplace_back(std::min(v[1],v[2]), std::max(v[1],v[2]));
+        rawEdges.emplace_back(std::min(v[1],v[3]), std::max(v[1],v[3]));
+        rawEdges.emplace_back(std::min(v[2],v[3]), std::max(v[2],v[3]));
+    }
+
+    // sort & unique
+    std::sort(rawEdges.begin(), rawEdges.end());
+    rawEdges.erase(std::unique(rawEdges.begin(), rawEdges.end()), rawEdges.end());
+
+    springs.reserve(rawEdges.size());
+
+    for (auto &e : rawEdges) {
+        Spring s;
+        s.a = e.first;
+        s.b = e.second;
+        // rest length from initial positions
+        s.restLength = (mpoints[s.a].position - mpoints[s.b].position).Length();
+        s.stiffness  = 0.2f;
+        s.damping    = 0.01f;
+        springs.push_back(s);
+    }
 
 
     // Enter the GLUT event loop

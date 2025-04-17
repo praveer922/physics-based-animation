@@ -5,14 +5,20 @@
 #include <cmath>
 #include "Util.h"
 
-
-struct PhysicsState {
-    float mass;
+// structs for nodes and springs
+struct MassPoint {
     cy::Vec3f position;
-    cy::Vec3f velocity;
+    cy::Vec3f velocity    = cy::Vec3f(0,0,0);
+    cy::Vec3f force       = cy::Vec3f(0,0,0);
+    float     mass        = 1.0f;
+    bool      fixed       = false;        // anchors won’t move
+};
 
-    cy::Matrix3f orientation;    // Rotation matrix representing orientation
-    cy::Vec3f angularVelocity;   // Angular velocity (axis-angle representation)
+struct Spring {
+    int       a, b;        // indices into your MassPoint array
+    float     restLength;
+    float     stiffness;   // e.g. 50–200
+    float     damping;     // e.g. 0.1–1.0
 };
 
 // Global boundaries and restitution factor.
@@ -24,46 +30,39 @@ cy::Vec3f maxBounds = {47.0f, 25.0f, 47.0f};
 namespace Physics {
 
 // This function uses an explicit integration method for updating the physics state.
-inline void PhysicsUpdate(PhysicsState& state, cy::Vec3f force, cy::Vec3f torque, float deltaTime) {
-    if (state.mass <= 0.0f) return; // Avoid division by zero
-
-    // Compute acceleration using Newton's Second Law: F = ma -> a = F/m
-    cy::Vec3f acceleration = force * (1.0f / state.mass);
-    
-    // Integrate velocity: v = v0 + a * dt
-    state.velocity += acceleration * deltaTime;    
-    // Integrate position: p = p0 + v * dt
-    state.position += state.velocity * deltaTime;
-
-
-    // Rotational dynamics (assuming an identity inertia tensor):
-    cy::Vec3f angularAcceleration = torque;
-    // Integrate angular velocity: ω = ω0 + α * dt
-    state.angularVelocity += angularAcceleration * deltaTime;
-
-    // Compute incremental rotation from angular velocity
-    float angularSpeed = state.angularVelocity.Length();
-    if (angularSpeed > 0.0f) {
-        cy::Vec3f axis = state.angularVelocity.GetNormalized();
-        cy::Matrix3f incrementalRotation;
-        incrementalRotation.SetRotation(axis, angularSpeed * deltaTime);
-
-        // Update orientation
-        state.orientation = incrementalRotation * state.orientation;
+inline void PhysicsUpdate(std::vector<MassPoint> & mpoints, std::vector<Spring> & springs, const cy::Vec3f externalForce, float deltaTime) {
+    // zero forces
+    for (auto &mp : mpoints) {
+        if (!mp.fixed) mp.force = cy::Vec3f(0, -9.8f * mp.mass, 0) + externalForce;  // gravity
     }
-    
-    // Check for wall boundary on the x, y, and z axes (3D box)
-    for (int i = 0; i < 3; i++) {
-        if (state.position[i] < minBounds[i]) {
-            state.position[i] = minBounds[i];
-            state.velocity[i] = -state.velocity[i] * restitution;
-        } else if (state.position[i] > maxBounds[i]) {
-            state.position[i] = maxBounds[i];
-            state.velocity[i] = -state.velocity[i] * restitution;
+
+    // spring forces
+    for (auto &s : springs) {
+        auto &A = mpoints[s.a];
+        auto &B = mpoints[s.b];
+        cy::Vec3f dir   = B.position - A.position;
+        float      len  = dir.Length();
+        if (len > 0) {
+            cy::Vec3f e = dir / len;
+            // Hooke’s law
+            float fs = -s.stiffness * (len - s.restLength);
+            // damping: relative velocity along the spring
+            float fd = -s.damping * ( (B.velocity - A.velocity).Dot(e) );
+            cy::Vec3f f = e * (fs + fd);
+            if (!A.fixed) A.force +=  f;
+            if (!B.fixed) B.force += -f;
         }
+    }
+
+    // integrate (semi‑implicit Euler)
+    for (auto &mp : mpoints) {
+        if (mp.fixed) continue;
+        mp.velocity += (deltaTime/mp.mass) * mp.force;
+        mp.position += deltaTime * mp.velocity;
     }
 }
 
+/*
 // Process collisions for each vertex of the model
 // vertices: a collection of the model's vertices in world space
 void ProcessFloorCollision(PhysicsState& state, const std::vector<cy::Vec3f>& vertices) {
@@ -114,25 +113,20 @@ void ProcessFloorCollision(PhysicsState& state, const std::vector<cy::Vec3f>& ve
         }
     }
 }
+*/
 
+void OnMouseClick(int mouseX, int mouseY, cy::Vec3f& externalForce) {
 
-void OnMouseClick(int mouseX, int mouseY, cy::Vec3f& externalTorque, PhysicsState & physicsState) {
-    cy::Vec3f hitPoint = Util::screenToWorldSpaceXPlane(mouseX,mouseY,800,600);
+    const float magnitude = 10.0f;
+    
+    externalForce = cy::Vec3f(mouseX * magnitude,
+        mouseY * magnitude,
+        0.0f);
 
-    std::cout << "Mouse click: " << hitPoint.x << "," << hitPoint.y << "," << hitPoint.z << std::endl;
-    
-    // Compute the lever arm from the object's center of mass.
-    cy::Vec3f r = hitPoint - physicsState.position;
-    
-    // Choose a force impulse to simulate the collision.
-    float forceMagnitude = 10000000000.0f; // Adjust this value to your needs.
-    cy::Vec3f forceDir = r.GetNormalized();
-    cy::Vec3f forceImpulse = forceDir * forceMagnitude;
-    
-    // Calculate the torque: τ = r × F.
-    externalTorque = r.Cross(forceImpulse);
-    std::cout << "External torque: " << externalTorque.x << "," << externalTorque.y << "," << externalTorque.z << std::endl;
+    std::cout << "External force: " << externalForce.x << "," << externalForce.y << "," << externalForce.z << std::endl;
 }
+
+
 
 
 } // namespace Physics
